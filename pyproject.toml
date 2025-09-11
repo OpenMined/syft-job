@@ -25,3 +25,8 @@ syft-job-runner = "syft_job.runner_main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+]

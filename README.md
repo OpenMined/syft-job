@@ -19,7 +19,7 @@ This folder contains all testing and demonstration scripts for the SyftJob syste
 ### Demo Scripts
 
 - **`demo_jobs_property.py`** - Interactive demo of the jobs property
-- **`demo_complete_new_functionality.py`** - Complete demo of new indexable functionality  
+- **`demo_complete_new_functionality.py`** - Complete demo of new indexable functionality
 - **`demo_corrected_workflow.py`** - Demo of corrected workflow (inbox → done)
 - **`test_complete_demo.py`** - Complete system demo with multiple users
 - **`test_runner_demo.py`** - Demo of job runner functionality
@@ -49,7 +49,7 @@ uv run python testing/test_runner_demo.py
 - Directory structure creation
 - Job file generation (run.sh, config.yaml)
 
-### 2. Jobs Property Tests  
+### 2. Jobs Property Tests
 - Indexable jobs access (`jobs[0]`)
 - Jobs list display and formatting
 - Current user datasite scanning only
@@ -77,7 +77,7 @@ uv run python testing/test_runner_demo.py
 - Automatic directory structure creation
 - Proper file permissions (run.sh executable)
 
-✅ **Indexable Jobs Property**  
+✅ **Indexable Jobs Property**
 - `job_client.jobs` returns `JobsList`
 - `jobs[0]`, `jobs[1]` indexing
 - `for job in jobs` iteration
@@ -115,7 +115,7 @@ All tests use temporary directories with this config structure:
 ```json
 {
   "data_dir": "/tmp/test_env/SyftBox",
-  "email": "admin@example.com", 
+  "email": "admin@example.com",
   "server_url": "https://syftbox.net",
   "refresh_token": "test_token"
 }
