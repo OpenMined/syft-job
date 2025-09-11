@@ -1,6 +1,6 @@
-from .models import JobSubmission, JobResult, JobStatus, JobConfig, SimpleJobSubmission
-from .runner import JobRunner
-from .submission import submit_job, submit_batch_jobs, submit, submit_batch
+from .client import JobClient, get_client
+from .config import SyftJobConfig
+from .job_runner import SyftJobRunner, create_runner
 
 __all__ = [
     # Models
@@ -10,7 +10,9 @@ __all__ = [
     # Main submission interface
     "submit_job", "submit_batch_jobs",
     # Convenience aliases
-    "submit", "submit_batch"
+    "submit", "submit_batch",
+    # New SyftBox job system
+    "JobClient", "get_client", "SyftJobConfig", "SyftJobRunner", "create_runner"
 ]
 
 
