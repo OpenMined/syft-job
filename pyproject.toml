@@ -12,11 +12,15 @@ dependencies = [
     "pydantic>=2.11.7",
     "pyyaml>=6.0",
     "syft-core>=0.2.8",
+    "syft-client"
 ]
 
 [project.scripts]
 syft-job = "syft_job:main"
 syft-job-runner = "syft_job.runner_main:main"
+
+[tool.uv.sources]
+"syft-client" = { git = "https://github.com/OpenMined/syft-client" , branch = "main" }
 
 [build-system]
 requires = ["hatchling"]

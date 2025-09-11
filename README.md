@@ -1,210 +1,122 @@
-# Syft Job Submission System
+# SyftJob Testing Scripts
 
-A generic Python-based job submission and execution system that supports multiple programming languages and syft:// URL-based data references for secure, distributed data science workflows.
+This folder contains all testing and demonstration scripts for the SyftJob system.
 
-## Features
+## Test Scripts
 
-- **🚀 Easy Data Scientist Interface**: Simple `import syft_job as sj; sj.submit_job()` API
-- **🔗 Syft URL Support**: Reference data using `syft://datasets/my-data.csv` URLs
-- **🌍 Multi-language support**: Python, Go, Rust, Bash, Node.js, Java, Ruby, R, Julia, etc.
-- **⚙️ Environment Variable Injection**: Input variables mapped directly (TRAIN, TEST, etc.)
-- **🔧 Custom Setup Scripts**: Support for `setup.sh` to configure execution environment
-- **📦 Batch processing**: Submit multiple jobs at once
-- **🔄 Async and sync execution**: Submit jobs for immediate or background execution
-- **📊 Job management**: Track status, cancel jobs, retrieve results
-- **🎯 Resource management**: Configurable timeouts, environment variables, working directories
-- **🌐 RESTful API**: Easy integration with any client (legacy compatibility)
+### Core Functionality Tests
 
-## Installation
+- **`test_syftbox_workflow.py`** - Original test for basic job submission workflow
+- **`test_jobs_property.py`** - Tests the original jobs property that scanned all datasites
+- **`test_new_jobs_functionality.py`** - Comprehensive test for indexable jobs with approval workflow
+- **`test_corrected_functionality.py`** - Tests corrected workflow (inbox → done)
+- **`test_approval_verification.py`** - Verifies approved jobs visibility in jobs list
+
+### Debugging Scripts
+
+- **`debug_jobs.py`** - Debug script for troubleshooting jobs scanning issues
+
+### Demo Scripts
+
+- **`demo_jobs_property.py`** - Interactive demo of the jobs property
+- **`demo_complete_new_functionality.py`** - Complete demo of new indexable functionality  
+- **`demo_corrected_workflow.py`** - Demo of corrected workflow (inbox → done)
+- **`test_complete_demo.py`** - Complete system demo with multiple users
+- **`test_runner_demo.py`** - Demo of job runner functionality
+
+## Quick Test Commands
+
+Run any test from the project root:
 
 ```bash
-# Install dependencies
-uv sync
+# Test basic workflow
+uv run python testing/test_syftbox_workflow.py
 
-# Or with pip
-pip install -e .
+# Test corrected functionality (inbox → done)
+uv run python testing/test_corrected_functionality.py
+
+# Run complete demo
+uv run python testing/demo_corrected_workflow.py
+
+# Test job runner
+uv run python testing/test_runner_demo.py
 ```
 
-## Quick Start
+## Test Categories
 
-### 🚀 New Syft Interface (Recommended)
+### 1. Job Submission Tests
+- Basic job submission to user datasites
+- Directory structure creation
+- Job file generation (run.sh, config.yaml)
 
-The easiest way for data scientists to submit jobs:
+### 2. Jobs Property Tests  
+- Indexable jobs access (`jobs[0]`)
+- Jobs list display and formatting
+- Current user datasite scanning only
 
-```python
-import syft_job as sj
+### 3. Job Approval Tests
+- `accept_by_depositing_result()` functionality
+- Job status transitions (inbox → done)
+- Result file deposition in outputs directory
+- Error handling for invalid operations
 
-# Submit a simple Python job
-result = sj.submit_job(
-    name="Data Analysis", 
-    code="syft://projects/user123/analysis-code",
-    inputs={
-        "TRAIN": "syft://datasets/cancer_train.csv",
-        "TEST": "syft://datasets/cancer_test.csv"
-    },
-    output_dir="syft://results/user123/job-output"
-)
+### 4. Job Runner Tests
+- Inbox monitoring functionality
+- New job detection and display
+- Directory structure creation
 
-print(f"Job completed with status: {result.status}")
-print(result.output)
-```
+### 5. Integration Tests
+- Complete workflow from submission to completion
+- Multiple jobs handling
+- Cross-user job management
 
-### Data Scientist Code Example
+## Key Features Tested
 
-Your job code automatically gets environment variables:
+✅ **Job Submission API**
+- `submit_bash_job(user, job_name, script)`
+- Automatic directory structure creation
+- Proper file permissions (run.sh executable)
 
-```python
-# train.py
-import os
-import pandas as pd
+✅ **Indexable Jobs Property**  
+- `job_client.jobs` returns `JobsList`
+- `jobs[0]`, `jobs[1]` indexing
+- `for job in jobs` iteration
+- Nice table display with status emojis
 
-# Environment variables are automatically set by the runner
-train_data = pd.read_csv(os.environ["TRAIN"])    # Points to resolved file
-test_data = pd.read_csv(os.environ["TEST"])      # Points to resolved file
-output_dir = os.environ["OUTPUT_DIR"]            # Output directory path
+✅ **Job Completion Workflow**
+- `jobs[0].accept_by_depositing_result(file_path)`
+- Jobs move from 📥 inbox → 🎉 done
+- Result files stored in `done/JOB_NAME/outputs/`
+- Proper error handling for invalid states
 
-# Your ML code here...
-model = train_model(train_data, test_data)
+✅ **Job Runner**
+- Continuous inbox monitoring
+- New job detection and display
+- Directory structure management
 
-# Save results
-model.save(f"{output_dir}/model.pkl")
-```
-
-### Multi-Language Support
-
-**Go Example:**
-```python
-result = sj.submit_job(
-    name="Go Data Processor",
-    code="syft://projects/user123/go-processor", 
-    inputs={"DATA": "syft://datasets/large_dataset.csv"},
-    language="go",
-    entrypoint="main.go"
-)
-```
-
-**With Custom Setup:**
-```python
-result = sj.submit_job(
-    name="ML Training Job",
-    code="syft://projects/user123/ml-training",
-    inputs={"DATA": "syft://datasets/training_data.csv"}, 
-    setup="setup.sh",  # Custom environment setup
-    language="python"
-)
-```
-
-### 📁 Folder-Based Job Execution
-
-Jobs are executed locally and create workspaces in the specified directory:
-
-```python
-# Jobs will be created in ./my_jobs/ directory
-result = sj.submit_job(
-    name="Analysis",
-    code="./my_code_folder", 
-    inputs={"DATA": "./data/input.csv"},
-    job_dir="./my_jobs"  # Job workspaces created here
-)
-
-# Check job workspace at: ./my_jobs/{job_id}/
-```
-
-## Folder Structure
-
-After running jobs, your directory structure will look like:
+## Directory Structure Tested
 
 ```
-my_project/
-├── my_code/           # Your source code
-├── data/              # Your input data  
-└── my_jobs/           # Job workspaces (one per job)
-    ├── job-abc123/    # Individual job workspace
-    │   ├── code/      # Copied/extracted job code
-    │   ├── inputs/    # Resolved input data files
-    │   └── outputs/   # Job output files
-    └── job-def456/
-        ├── code/
-        ├── inputs/ 
+SyftBox/datasites/<user_email>/app_data/job/
+├── inbox/           # New job submissions
+├── approved/        # (Future: manual approval step)
+└── done/            # Completed with results
+    └── <JOB_NAME>/
+        ├── run.sh
+        ├── config.yaml
         └── outputs/
+            └── <result_files>
 ```
 
-## Usage Examples
+## Configuration Used in Tests
 
-### Simple Python Job
+All tests use temporary directories with this config structure:
 
-```python
-import syft_job as sj
-
-result = sj.submit_job(
-    name="Data Analysis",
-    code="./analysis_code",  # Local folder with your Python code
-    inputs={
-        "TRAIN": "./data/train.csv",  # Local file
-        "TEST": "syft://datasets/test.csv"  # Syft URL (resolved automatically)
-    },
-    job_dir="./jobs"  # Where to create job workspaces
-)
-```
-
-### Multi-Language Support
-
-```python
-# Python job
-result = sj.submit_job(name="python_job", code="./py_code", language="python")
-
-# Go job  
-result = sj.submit_job(name="go_job", code="./go_code", language="go", entrypoint="main.go")
-
-# With custom setup
-result = sj.submit_job(name="custom_job", code="./code", setup="setup.sh")
-```
-
-### Batch Processing
-
-```python
-jobs = [
-    {"name": f"Job {i}", "code": "./worker_code", "inputs": {"DATA": f"./data_{i}.csv"}}
-    for i in range(10)
-]
-
-results = sj.submit_batch_jobs(jobs, job_dir="./batch_jobs")
-```
-
-## Running Examples
-
-```bash
-# Run the folder-based examples
-python example_usage.py
-
-# Or use the CLI
-syft-job --example --job-dir ./my_jobs
-```
-
-## Development
-
-```bash
-# Install in development mode
-uv sync
-
-# Run examples
-syft-job --example
-
-# Run tests (if available)
-pytest
-```
-
-## Job Workspace Inspection
-
-Job workspaces are preserved by default for inspection:
-
-```bash
-# List job workspaces
-ls ./jobs/
-
-# Inspect a specific job
-ls ./jobs/job-abc123/
-  code/      # Your code that was executed
-  inputs/    # Input data files that were provided
-  outputs/   # Files created by your job
+```json
+{
+  "data_dir": "/tmp/test_env/SyftBox",
+  "email": "admin@example.com", 
+  "server_url": "https://syftbox.net",
+  "refresh_token": "test_token"
+}
 ```
