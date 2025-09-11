@@ -69,6 +69,229 @@ class JobInfo:
         self.location = done_dir
         
         return destination
+    
+    def _repr_html_(self) -> str:
+        """HTML representation for individual job display in Jupyter."""
+        # Status styling
+        status_styles = {
+            "inbox": {"color": "#6976ae", "bg": "#e8f2ff", "emoji": "📥"},
+            "approved": {"color": "#53bea9", "bg": "#e6f9f4", "emoji": "✅"}, 
+            "done": {"color": "#937098", "bg": "#f3e5f5", "emoji": "🎉"}
+        }
+        
+        style_info = status_styles.get(self.status, {"color": "#718096", "bg": "#f7fafc", "emoji": "❓"})
+        
+        # Read job script if available
+        script_content = "No script available"
+        try:
+            script_file = self.location / "run.sh"
+            if script_file.exists():
+                with open(script_file, 'r') as f:
+                    script_content = f.read().strip()
+                    # If content is too long, truncate and add ellipsis
+                    if len(script_content) > 500:
+                        script_content = script_content[:500] + "..."
+                    # Escape HTML characters
+                    script_content = (script_content
+                                    .replace('&', '&amp;')
+                                    .replace('<', '&lt;')
+                                    .replace('>', '&gt;')
+                                    .replace('"', '&quot;')
+                                    .replace("'", '&#x27;'))
+        except Exception:
+            pass
+        
+        # Read job config if available
+        submitted_time = "Unknown"
+        try:
+            config_file = self.location / "config.yaml"
+            if config_file.exists():
+                import yaml
+                from datetime import datetime
+                with open(config_file, 'r') as f:
+                    config_data = yaml.safe_load(f)
+                    submitted_at = config_data.get('submitted_at')
+                    
+                    if submitted_at:
+                        # Parse ISO format timestamp
+                        try:
+                            dt = datetime.fromisoformat(submitted_at.replace('Z', '+00:00'))
+                            submitted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                        except:
+                            submitted_time = str(submitted_at)
+                    else:
+                        # Fallback to file modification time
+                        import os
+                        mtime = os.path.getmtime(config_file)
+                        dt = datetime.fromtimestamp(mtime)
+                        submitted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                # If no config file, use job directory modification time
+                import os
+                if self.location.exists():
+                    mtime = os.path.getmtime(self.location)
+                    dt = datetime.fromtimestamp(mtime)
+                    submitted_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            submitted_time = "Unknown"
+        
+        return f"""
+        <style>
+            .syftjob-single {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 16px 0;
+                background: white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                max-width: 600px;
+            }}
+            .syftjob-single-header {{
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+                border-bottom: 1px solid #e2e8f0;
+            }}
+            .syftjob-single-status {{
+                background: {style_info['bg']};
+                color: {style_info['color']};
+                padding: 4px 12px;
+                border-radius: 16px;
+                font-size: 12px;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }}
+            .syftjob-single-name {{
+                font-size: 18px;
+                font-weight: 600;
+                color: #1a202c;
+                margin: 0;
+                flex: 1;
+            }}
+            .syftjob-single-details {{
+                display: grid;
+                gap: 8px;
+                font-size: 14px;
+                color: #4a5568;
+            }}
+            .syftjob-single-detail {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }}
+            .syftjob-single-detail strong {{
+                color: #2d3748;
+                font-weight: 600;
+                min-width: 100px;
+            }}
+            .syftjob-single-script {{
+                background: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                padding: 12px;
+                font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
+                font-size: 11px;
+                color: #2d3748;
+                margin-top: 8px;
+                overflow: auto;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 200px;
+                line-height: 1.4;
+            }}
+            
+            /* Dark theme */
+            @media (prefers-color-scheme: dark) {{
+                .syftjob-single {{
+                    background: #1a202c;
+                    border-color: #4a5568;
+                    color: #e2e8f0;
+                }}
+                .syftjob-single-header {{
+                    border-bottom-color: #4a5568;
+                }}
+                .syftjob-single-name {{
+                    color: #f7fafc;
+                }}
+                .syftjob-single-details {{
+                    color: #cbd5e0;
+                }}
+                .syftjob-single-detail strong {{
+                    color: #e2e8f0;
+                }}
+                .syftjob-single-script {{
+                    background: #2d3748;
+                    border-color: #4a5568;
+                    color: #e2e8f0;
+                }}
+            }}
+            
+            /* Jupyter dark theme */
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single,
+            body[data-jp-theme-light="false"] .syftjob-single {{
+                background: #1a202c;
+                border-color: #4a5568;
+                color: #e2e8f0;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-header,
+            body[data-jp-theme-light="false"] .syftjob-single-header {{
+                border-bottom-color: #4a5568;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-name,
+            body[data-jp-theme-light="false"] .syftjob-single-name {{
+                color: #f7fafc;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-details,
+            body[data-jp-theme-light="false"] .syftjob-single-details {{
+                color: #cbd5e0;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-detail strong,
+            body[data-jp-theme-light="false"] .syftjob-single-detail strong {{
+                color: #e2e8f0;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-script,
+            body[data-jp-theme-light="false"] .syftjob-single-script {{
+                background: #2d3748;
+                border-color: #4a5568;
+                color: #e2e8f0;
+            }}
+        </style>
+        <div class="syftjob-single">
+            <div class="syftjob-single-header">
+                <h3 class="syftjob-single-name">{self.name}</h3>
+                <span class="syftjob-single-status">
+                    {style_info['emoji']} {self.status.upper()}
+                </span>
+            </div>
+            <div class="syftjob-single-details">
+                <div class="syftjob-single-detail">
+                    <strong>User:</strong>
+                    <span>{self.user}</span>
+                </div>
+                <div class="syftjob-single-detail">
+                    <strong>Submitted by:</strong>
+                    <span>{self.submitted_by}</span>
+                </div>
+                <div class="syftjob-single-detail">
+                    <strong>Location:</strong>
+                    <span>{self.location}</span>
+                </div>
+                <div class="syftjob-single-detail">
+                    <strong>Submitted:</strong>
+                    <span>{submitted_time}</span>
+                </div>
+                <div class="syftjob-single-detail">
+                    <strong>Script:</strong>
+                    <div class="syftjob-single-script">{script_content}</div>
+                </div>
+            </div>
+        </div>
+        """
 
 
 class JobsList:
@@ -157,47 +380,22 @@ class JobsList:
         if not self._jobs:
             return """
             <style>
-                @keyframes syftjob-pulse {
-                    0% { opacity: 0.6; transform: scale(0.98); }
-                    50% { opacity: 1; transform: scale(1); }
-                    100% { opacity: 0.6; transform: scale(0.98); }
-                }
                 
                 .syftjob-empty {
-                    padding: 40px 30px; 
+                    padding: 30px 20px; 
                     text-align: center; 
-                    border-radius: 16px; 
+                    border-radius: 8px; 
                     background: linear-gradient(135deg, #f8c073 0%, #f79763 50%, #cc677b 100%);
-                    border: 1px solid rgba(248,192,115,0.3);
-                    box-shadow: 0 8px 32px rgba(248,192,115,0.3);
-                    transition: all 0.3s ease;
-                    position: relative;
-                    overflow: hidden;
+                    border: 1px solid rgba(248,192,115,0.2);
                     color: white;
                 }
                 
-                .syftjob-empty::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: -100%;
-                    width: 100%;
-                    height: 100%;
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-                    animation: syftjob-shine 3s infinite;
-                }
-                
-                @keyframes syftjob-shine {
-                    0% { left: -100%; }
-                    100% { left: 100%; }
-                }
                 
                 .syftjob-empty h3 { 
                     margin: 0 0 12px 0; 
-                    font-size: 24px;
+                    font-size: 18px;
                     color: white;
-                    font-weight: 700;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    font-weight: 600;
                 }
                 
                 .syftjob-empty p { 
@@ -208,25 +406,19 @@ class JobsList:
                 }
                 
                 .syftjob-empty-icon {
-                    font-size: 48px;
-                    margin-bottom: 20px;
+                    font-size: 24px;
+                    margin-bottom: 12px;
                     display: block;
-                    animation: syftjob-pulse 2s infinite;
                 }
                 
                 /* Dark theme */
                 @media (prefers-color-scheme: dark) {
                     .syftjob-empty {
-                        background: linear-gradient(135deg, #937098 0%, #6976ae 50%, #52a8c5 100%);
-                        border-color: rgba(147,112,152,0.4);
-                        box-shadow: 0 8px 32px rgba(147,112,152,0.4);
-                    }
-                    .syftjob-empty::before {
-                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                        background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+                        border-color: rgba(74,85,104,0.2);
                     }
                     .syftjob-empty h3 { 
                         color: white;
-                        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
                     }
                     .syftjob-empty p { 
                         color: rgba(255,255,255,0.95); 
@@ -237,18 +429,12 @@ class JobsList:
                 /* Jupyter dark theme detection */
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty,
                 body[data-jp-theme-light="false"] .syftjob-empty {
-                    background: linear-gradient(135deg, #937098 0%, #6976ae 50%, #52a8c5 100%);
-                    border-color: rgba(147,112,152,0.4);
-                    box-shadow: 0 8px 32px rgba(147,112,152,0.4);
-                }
-                .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty::before,
-                body[data-jp-theme-light="false"] .syftjob-empty::before {
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+                    border-color: rgba(74,85,104,0.2);
                 }
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty h3,
                 body[data-jp-theme-light="false"] .syftjob-empty h3 {
                     color: white;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
                 }
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty p,
                 body[data-jp-theme-light="false"] .syftjob-empty p {
@@ -289,65 +475,33 @@ class JobsList:
         # Build HTML with enhanced visual appeal
         html = f"""
         <style>
-            @keyframes syftjob-fadeIn {{
-                from {{ opacity: 0; transform: translateY(10px); }}
-                to {{ opacity: 1; transform: translateY(0); }}
-            }}
-            
-            @keyframes syftjob-statusPulse {{
-                0%, 100% {{ transform: scale(1); }}
-                50% {{ transform: scale(1.05); }}
-            }}
             
             .syftjob-container {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
                 margin: 20px 0;
-                animation: syftjob-fadeIn 0.6s ease-out;
-                border-radius: 16px;
+                border-radius: 8px;
                 overflow: auto;
                 max-width: 100%;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                border: 1px solid #e2e8f0;
             }}
             
             .syftjob-header {{
                 background: linear-gradient(135deg, #f8c073 0%, #f79763 25%, #cc677b 50%, #937098 75%, #6976ae 100%);
                 color: white;
-                padding: 24px;
-                position: relative;
-                overflow: hidden;
-            }}
-            
-            .syftjob-header::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-                animation: syftjob-shine 4s infinite;
-            }}
-            
-            @keyframes syftjob-shine {{
-                0% {{ left: -100%; }}
-                100% {{ left: 100%; }}
+                padding: 20px;
             }}
             
             .syftjob-header h3 {{ 
                 margin: 0 0 8px 0; 
-                font-size: 22px; 
-                font-weight: 700;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                position: relative;
-                z-index: 1;
+                font-size: 20px; 
+                font-weight: 600;
             }}
             .syftjob-header p {{ 
                 margin: 0; 
                 opacity: 0.9; 
-                font-size: 16px; 
-                font-weight: 500;
-                position: relative;
-                z-index: 1;
+                font-size: 14px; 
+                font-weight: 400;
             }}
             
             .syftjob-table {{
@@ -426,60 +580,39 @@ class JobsList:
             }}
             
             .syftjob-status-inbox {{
-                background: linear-gradient(135deg, #6976ae 0%, #52a8c5 100%);
+                background: #6976ae;
                 color: white;
-                padding: 8px 16px;
-                border-radius: 12px;
+                padding: 4px 12px;
+                border-radius: 16px;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 600;
                 display: inline-flex;
                 align-items: center;
-                gap: 6px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                box-shadow: 0 4px 12px rgba(105, 118, 174, 0.3);
-                transition: all 0.3s ease;
-            }}
-            .syftjob-status-inbox:hover {{
-                animation: syftjob-statusPulse 1s infinite;
+                gap: 4px;
             }}
             
             .syftjob-status-approved {{
-                background: linear-gradient(135deg, #53bea9 0%, #96d195 100%);
+                background: #53bea9;
                 color: white;
-                padding: 8px 16px;
-                border-radius: 12px;
+                padding: 4px 12px;
+                border-radius: 16px;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 600;
                 display: inline-flex;
                 align-items: center;
-                gap: 6px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                box-shadow: 0 4px 12px rgba(83, 190, 169, 0.3);
-                transition: all 0.3s ease;
-            }}
-            .syftjob-status-approved:hover {{
-                animation: syftjob-statusPulse 1s infinite;
+                gap: 4px;
             }}
             
             .syftjob-status-done {{
-                background: linear-gradient(135deg, #937098 0%, #cc677b 100%);
+                background: #937098;
                 color: white;
-                padding: 8px 16px;
-                border-radius: 12px;
+                padding: 4px 12px;
+                border-radius: 16px;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 600;
                 display: inline-flex;
                 align-items: center;
-                gap: 6px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                box-shadow: 0 4px 12px rgba(147, 112, 152, 0.3);
-                transition: all 0.3s ease;
-            }}
-            .syftjob-status-done:hover {{
-                animation: syftjob-statusPulse 1s infinite;
+                gap: 4px;
             }}
             
             .syftjob-submitted {{ 
@@ -547,15 +680,12 @@ class JobsList:
             /* Dark theme styles */
             @media (prefers-color-scheme: dark) {{
                 .syftjob-container {{
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    border-color: #4a5568;
                 }}
                 
                 .syftjob-header {{
-                    background: linear-gradient(135deg, #52a8c5 0%, #6976ae 25%, #937098 50%, #cc677b 75%, #f79763 100%);
-                }}
-                
-                .syftjob-header::before {{
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+                    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
                 }}
                 
                 .syftjob-table {{ 
@@ -600,19 +730,19 @@ class JobsList:
                 .syftjob-submitted {{ color: #a0aec0; }}
                 
                 .syftjob-status-inbox {{ 
-                    background: linear-gradient(135deg, #96d195 0%, #f2d98c 100%);
-                    color: white;
-                    box-shadow: 0 4px 12px rgba(150, 209, 149, 0.4);
+                    background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
+                    color: #e2e8f0;
+                    box-shadow: 0 2px 8px rgba(74, 85, 104, 0.3);
                 }}
                 .syftjob-status-approved {{ 
-                    background: linear-gradient(135deg, #53bea9 0%, #52a8c5 100%);
-                    color: white;
-                    box-shadow: 0 4px 12px rgba(83, 190, 169, 0.4);
+                    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+                    color: #c6f6d5;
+                    box-shadow: 0 2px 8px rgba(56, 161, 105, 0.3);
                 }}
                 .syftjob-status-done {{ 
-                    background: linear-gradient(135deg, #f2d98c 0%, #f79763 100%);
-                    color: #2d3748;
-                    box-shadow: 0 4px 12px rgba(242, 217, 140, 0.4);
+                    background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+                    color: #e9d8fd;
+                    box-shadow: 0 2px 8px rgba(128, 90, 213, 0.3);
                 }}
                 
                 .syftjob-footer {{ 
@@ -639,7 +769,7 @@ class JobsList:
             /* Jupyter-specific dark theme detection */
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-header,
             body[data-jp-theme-light="false"] .syftjob-header {{
-                background: linear-gradient(135deg, #52a8c5 0%, #6976ae 25%, #937098 50%, #cc677b 75%, #f79763 100%);
+                background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-table,
@@ -694,23 +824,23 @@ class JobsList:
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-inbox,
             body[data-jp-theme-light="false"] .syftjob-status-inbox {{ 
-                background: linear-gradient(135deg, #96d195 0%, #f2d98c 100%);
-                color: white;
-                box-shadow: 0 4px 12px rgba(150, 209, 149, 0.4);
+                background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
+                color: #e2e8f0;
+                box-shadow: 0 2px 8px rgba(74, 85, 104, 0.3);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-approved,
             body[data-jp-theme-light="false"] .syftjob-status-approved {{ 
-                background: linear-gradient(135deg, #53bea9 0%, #52a8c5 100%);
-                color: white;
-                box-shadow: 0 4px 12px rgba(83, 190, 169, 0.4);
+                background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+                color: #c6f6d5;
+                box-shadow: 0 2px 8px rgba(56, 161, 105, 0.3);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-done,
             body[data-jp-theme-light="false"] .syftjob-status-done {{ 
-                background: linear-gradient(135deg, #f2d98c 0%, #f79763 100%);
-                color: #2d3748;
-                box-shadow: 0 4px 12px rgba(242, 217, 140, 0.4);
+                background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+                color: #e9d8fd;
+                box-shadow: 0 2px 8px rgba(128, 90, 213, 0.3);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-footer,
@@ -866,9 +996,11 @@ class JobClient:
         
         # Create config.yaml file
         config_yaml_path = job_dir / "config.yaml"
+        from datetime import datetime, timezone
         job_config = {
             "name": job_name,
-            "submitted_by": self.config.email
+            "submitted_by": self.config.email,
+            "submitted_at": datetime.now(timezone.utc).isoformat()
         }
         
         with open(config_yaml_path, 'w') as f:

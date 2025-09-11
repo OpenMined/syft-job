@@ -12,7 +12,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "pyyaml>=6.0",
     "syft-core>=0.2.8",
-    "syft-client"
+    "syft-client",
 ]
 
 [project.scripts]

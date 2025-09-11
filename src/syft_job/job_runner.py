@@ -1,5 +1,6 @@
 import time
 import os
+import shutil
 from pathlib import Path
 from typing import Set, List
 from .config import SyftJobConfig
@@ -85,6 +86,83 @@ class SyftJobRunner:
                 print(f"   Could not read config: {e}")
         
         print("-" * 50)
+    
+    def reset_all_jobs(self) -> None:
+        """
+        Delete all jobs and recreate the job folder structure.
+        
+        This will:
+        1. Delete all jobs in inbox, approved, and done folders
+        2. Recreate the empty folder structure
+        3. Reset the known jobs tracking
+        """
+        root_email = self.config.email
+        job_dir = self.config.get_job_dir(root_email)
+        
+        print(f"🔄 RESETTING ALL JOBS for {root_email}")
+        print(f"📁 Target directory: {job_dir}")
+        
+        if not job_dir.exists():
+            print("📭 No job directory found - nothing to reset")
+            self._ensure_root_user_directories()
+            return
+        
+        # Count jobs before deletion
+        total_jobs = 0
+        job_counts = {}
+        
+        for status_dir in ["inbox", "approved", "done"]:
+            status_path = job_dir / status_dir
+            if status_path.exists():
+                job_list = [item for item in status_path.iterdir() if item.is_dir()]
+                job_counts[status_dir] = len(job_list)
+                total_jobs += len(job_list)
+                
+                if job_list:
+                    print(f"📋 Found {len(job_list)} jobs in {status_dir}:")
+                    for job in job_list[:5]:  # Show first 5
+                        print(f"   - {job.name}")
+                    if len(job_list) > 5:
+                        print(f"   ... and {len(job_list) - 5} more")
+        
+        if total_jobs == 0:
+            print("📭 No jobs found to delete")
+            self._ensure_root_user_directories()
+            return
+        
+        # Confirm deletion
+        print(f"\n⚠️  WARNING: This will permanently delete {total_jobs} jobs!")
+        print("   This action cannot be undone.")
+        
+        try:
+            # Delete the entire job directory
+            print(f"🗑️  Deleting job directory: {job_dir}")
+            shutil.rmtree(job_dir)
+            
+            # Recreate the folder structure
+            print("📁 Recreating job folder structure...")
+            self._ensure_root_user_directories()
+            
+            # Reset known jobs tracking
+            self.known_jobs.clear()
+            
+            print("✅ Job reset completed successfully!")
+            print(f"📊 Summary:")
+            print(f"   - Deleted {total_jobs} jobs total")
+            for status, count in job_counts.items():
+                if count > 0:
+                    print(f"   - {status}: {count} jobs deleted")
+            print(f"   - Clean folder structure recreated")
+            
+        except Exception as e:
+            print(f"❌ Error during reset: {e}")
+            print("🔧 Attempting to recreate folder structure anyway...")
+            try:
+                self._ensure_root_user_directories()
+                print("✅ Folder structure recreated")
+            except Exception as recovery_error:
+                print(f"❌ Failed to recreate folders: {recovery_error}")
+                raise
     
     def check_for_new_jobs(self) -> None:
         """Check for new jobs in the inbox and print them."""
