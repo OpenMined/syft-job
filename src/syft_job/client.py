@@ -167,12 +167,13 @@ class JobsList:
                     padding: 40px 30px; 
                     text-align: center; 
                     border-radius: 16px; 
-                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                    border: 1px solid rgba(0,0,0,0.08);
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+                    background: linear-gradient(135deg, #f8c073 0%, #f79763 50%, #cc677b 100%);
+                    border: 1px solid rgba(248,192,115,0.3);
+                    box-shadow: 0 8px 32px rgba(248,192,115,0.3);
                     transition: all 0.3s ease;
                     position: relative;
                     overflow: hidden;
+                    color: white;
                 }
                 
                 .syftjob-empty::before {
@@ -194,18 +195,16 @@ class JobsList:
                 .syftjob-empty h3 { 
                     margin: 0 0 12px 0; 
                     font-size: 24px;
-                    background: linear-gradient(135deg, #6c757d, #495057);
-                    background-clip: text;
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    font-weight: 600;
+                    color: white;
+                    font-weight: 700;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 }
                 
                 .syftjob-empty p { 
                     margin: 0; 
-                    color: #868e96; 
+                    color: rgba(255,255,255,0.9); 
                     font-size: 16px;
-                    opacity: 0.8;
+                    opacity: 0.95;
                 }
                 
                 .syftjob-empty-icon {
@@ -218,43 +217,43 @@ class JobsList:
                 /* Dark theme */
                 @media (prefers-color-scheme: dark) {
                     .syftjob-empty {
-                        background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-                        border-color: rgba(255,255,255,0.1);
-                        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                        background: linear-gradient(135deg, #937098 0%, #6976ae 50%, #52a8c5 100%);
+                        border-color: rgba(147,112,152,0.4);
+                        box-shadow: 0 8px 32px rgba(147,112,152,0.4);
                     }
                     .syftjob-empty::before {
-                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
                     }
                     .syftjob-empty h3 { 
-                        background: linear-gradient(135deg, #e2e8f0, #cbd5e0);
-                        background-clip: text;
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
+                        color: white;
+                        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
                     }
-                    .syftjob-empty p { color: #a0aec0; }
+                    .syftjob-empty p { 
+                        color: rgba(255,255,255,0.95); 
+                        opacity: 0.95;
+                    }
                 }
                 
                 /* Jupyter dark theme detection */
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty,
                 body[data-jp-theme-light="false"] .syftjob-empty {
-                    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-                    border-color: rgba(255,255,255,0.1);
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                    background: linear-gradient(135deg, #937098 0%, #6976ae 50%, #52a8c5 100%);
+                    border-color: rgba(147,112,152,0.4);
+                    box-shadow: 0 8px 32px rgba(147,112,152,0.4);
                 }
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty::before,
                 body[data-jp-theme-light="false"] .syftjob-empty::before {
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
                 }
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty h3,
                 body[data-jp-theme-light="false"] .syftjob-empty h3 {
-                    background: linear-gradient(135deg, #e2e8f0, #cbd5e0);
-                    background-clip: text;
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    color: white;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
                 }
                 .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-empty p,
                 body[data-jp-theme-light="false"] .syftjob-empty p {
-                    color: #a0aec0;
+                    color: rgba(255,255,255,0.95);
+                    opacity: 0.95;
                 }
             </style>
             <div class="syftjob-empty">
@@ -272,18 +271,18 @@ class JobsList:
         status_styles = {
             "inbox": {
                 "emoji": "📥", 
-                "light": {"color": "#007bff", "bg": "#e3f2fd"},
-                "dark": {"color": "#63b3ed", "bg": "#2b6cb0"}
+                "light": {"color": "#6976ae", "bg": "#e8f2ff"},
+                "dark": {"color": "#96d195", "bg": "#52a8c5"}
             },
             "approved": {
                 "emoji": "✅", 
-                "light": {"color": "#28a745", "bg": "#e8f5e9"},
-                "dark": {"color": "#68d391", "bg": "#276749"}
+                "light": {"color": "#53bea9", "bg": "#e6f9f4"},
+                "dark": {"color": "#53bea9", "bg": "#2a5d52"}
             }, 
             "done": {
                 "emoji": "🎉", 
-                "light": {"color": "#6f42c1", "bg": "#f3e5f5"},
-                "dark": {"color": "#b794f6", "bg": "#553c9a"}
+                "light": {"color": "#937098", "bg": "#f3e5f5"},
+                "dark": {"color": "#f2d98c", "bg": "#cc677b"}
             }
         }
         
@@ -305,12 +304,13 @@ class JobsList:
                 margin: 20px 0;
                 animation: syftjob-fadeIn 0.6s ease-out;
                 border-radius: 16px;
-                overflow: hidden;
+                overflow: auto;
+                max-width: 100%;
                 box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             }}
             
             .syftjob-header {{
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+                background: linear-gradient(135deg, #f8c073 0%, #f79763 25%, #cc677b 50%, #937098 75%, #6976ae 100%);
                 color: white;
                 padding: 24px;
                 position: relative;
@@ -354,6 +354,8 @@ class JobsList:
                 width: 100%;
                 border-collapse: collapse;
                 background: white;
+                table-layout: auto;
+                overflow-wrap: break-word;
             }}
             
             .syftjob-thead {{
@@ -424,7 +426,7 @@ class JobsList:
             }}
             
             .syftjob-status-inbox {{
-                background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+                background: linear-gradient(135deg, #6976ae 0%, #52a8c5 100%);
                 color: white;
                 padding: 8px 16px;
                 border-radius: 12px;
@@ -435,7 +437,7 @@ class JobsList:
                 gap: 6px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+                box-shadow: 0 4px 12px rgba(105, 118, 174, 0.3);
                 transition: all 0.3s ease;
             }}
             .syftjob-status-inbox:hover {{
@@ -443,7 +445,7 @@ class JobsList:
             }}
             
             .syftjob-status-approved {{
-                background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+                background: linear-gradient(135deg, #53bea9 0%, #96d195 100%);
                 color: white;
                 padding: 8px 16px;
                 border-radius: 12px;
@@ -454,7 +456,7 @@ class JobsList:
                 gap: 6px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                box-shadow: 0 4px 12px rgba(56, 161, 105, 0.3);
+                box-shadow: 0 4px 12px rgba(83, 190, 169, 0.3);
                 transition: all 0.3s ease;
             }}
             .syftjob-status-approved:hover {{
@@ -462,7 +464,7 @@ class JobsList:
             }}
             
             .syftjob-status-done {{
-                background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+                background: linear-gradient(135deg, #937098 0%, #cc677b 100%);
                 color: white;
                 padding: 8px 16px;
                 border-radius: 12px;
@@ -473,7 +475,7 @@ class JobsList:
                 gap: 6px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                box-shadow: 0 4px 12px rgba(128, 90, 213, 0.3);
+                box-shadow: 0 4px 12px rgba(147, 112, 152, 0.3);
                 transition: all 0.3s ease;
             }}
             .syftjob-status-done:hover {{
@@ -549,7 +551,7 @@ class JobsList:
                 }}
                 
                 .syftjob-header {{
-                    background: linear-gradient(135deg, #1a365d 0%, #2a4365 50%, #553c9a 100%);
+                    background: linear-gradient(135deg, #52a8c5 0%, #6976ae 25%, #937098 50%, #cc677b 75%, #f79763 100%);
                 }}
                 
                 .syftjob-header::before {{
@@ -598,19 +600,19 @@ class JobsList:
                 .syftjob-submitted {{ color: #a0aec0; }}
                 
                 .syftjob-status-inbox {{ 
-                    background: linear-gradient(135deg, #2c5282 0%, #2a4365 100%);
-                    color: #90cdf4;
-                    box-shadow: 0 4px 12px rgba(44, 82, 130, 0.4);
+                    background: linear-gradient(135deg, #96d195 0%, #f2d98c 100%);
+                    color: white;
+                    box-shadow: 0 4px 12px rgba(150, 209, 149, 0.4);
                 }}
                 .syftjob-status-approved {{ 
-                    background: linear-gradient(135deg, #2f855a 0%, #276749 100%);
-                    color: #9ae6b4;
-                    box-shadow: 0 4px 12px rgba(47, 133, 90, 0.4);
+                    background: linear-gradient(135deg, #53bea9 0%, #52a8c5 100%);
+                    color: white;
+                    box-shadow: 0 4px 12px rgba(83, 190, 169, 0.4);
                 }}
                 .syftjob-status-done {{ 
-                    background: linear-gradient(135deg, #6b46c1 0%, #553c9a 100%);
-                    color: #d6bcfa;
-                    box-shadow: 0 4px 12px rgba(107, 70, 193, 0.4);
+                    background: linear-gradient(135deg, #f2d98c 0%, #f79763 100%);
+                    color: #2d3748;
+                    box-shadow: 0 4px 12px rgba(242, 217, 140, 0.4);
                 }}
                 
                 .syftjob-footer {{ 
@@ -637,7 +639,7 @@ class JobsList:
             /* Jupyter-specific dark theme detection */
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-header,
             body[data-jp-theme-light="false"] .syftjob-header {{
-                background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+                background: linear-gradient(135deg, #52a8c5 0%, #6976ae 25%, #937098 50%, #cc677b 75%, #f79763 100%);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-table,
@@ -692,22 +694,29 @@ class JobsList:
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-inbox,
             body[data-jp-theme-light="false"] .syftjob-status-inbox {{ 
-                background: #2b6cb0; color: #63b3ed; 
+                background: linear-gradient(135deg, #96d195 0%, #f2d98c 100%);
+                color: white;
+                box-shadow: 0 4px 12px rgba(150, 209, 149, 0.4);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-approved,
             body[data-jp-theme-light="false"] .syftjob-status-approved {{ 
-                background: #276749; color: #68d391; 
+                background: linear-gradient(135deg, #53bea9 0%, #52a8c5 100%);
+                color: white;
+                box-shadow: 0 4px 12px rgba(83, 190, 169, 0.4);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-done,
             body[data-jp-theme-light="false"] .syftjob-status-done {{ 
-                background: #553c9a; color: #b794f6; 
+                background: linear-gradient(135deg, #f2d98c 0%, #f79763 100%);
+                color: #2d3748;
+                box-shadow: 0 4px 12px rgba(242, 217, 140, 0.4);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-footer,
             body[data-jp-theme-light="false"] .syftjob-footer {{ 
-                background: #2d3748; border-top-color: #4a5568; 
+                background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%); 
+                border-top-color: rgba(147,112,152,0.3);
             }}
             
             .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-hint,
