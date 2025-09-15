@@ -37,28 +37,28 @@ class JobInfo:
             f"JobInfo(name='{self.name}', user='{self.user}', status='{self.status}')"
         )
 
-    def accept_by_depositing_result(self, file_path: str) -> Path:
+    def accept_by_depositing_result(self, path: str) -> Path:
         """
-        Accept a job by depositing the result file and moving it to done status.
+        Accept a job by depositing the result file or folder and moving it to done status.
 
         Args:
-            file_path: Path to the result file to deposit
+            path: Path to the result file or folder to deposit
 
         Returns:
-            Path to the deposited result file
+            Path to the deposited result file or folder in the outputs directory
 
         Raises:
             ValueError: If job is not in inbox status
-            FileNotFoundError: If the result file doesn't exist
+            FileNotFoundError: If the result file or folder doesn't exist
         """
         if self.status != "inbox":
             raise ValueError(
                 f"Job '{self.name}' is not in inbox status (current: {self.status})"
             )
 
-        result_file = Path(file_path)
-        if not result_file.exists():
-            raise FileNotFoundError(f"Result file not found: {file_path}")
+        result_path = Path(path)
+        if not result_path.exists():
+            raise FileNotFoundError(f"Result path not found: {path}")
 
         # Prepare done directory path
         done_dir = self._config.get_done_dir(self.user) / self.name
@@ -73,10 +73,18 @@ class JobInfo:
         outputs_dir = done_dir / "outputs"
         outputs_dir.mkdir(exist_ok=True)
 
-        # Copy the result file to outputs directory
-        result_filename = result_file.name
-        destination = outputs_dir / result_filename
-        shutil.copy2(str(result_file), str(destination))
+        # Handle both files and folders
+        result_name = result_path.name
+        destination = outputs_dir / result_name
+
+        if result_path.is_file():
+            # Copy file to outputs directory
+            shutil.copy2(str(result_path), str(destination))
+        elif result_path.is_dir():
+            # Copy entire directory to outputs directory
+            shutil.copytree(str(result_path), str(destination))
+        else:
+            raise ValueError(f"Path is neither a file nor a directory: {path}")
 
         # Update this object's state
         self.status = "done"
@@ -390,7 +398,7 @@ class JobsList:
 
         lines.append("")
         lines.append(
-            "💡 Use job_client.jobs[0].accept_by_depositing_result('file.txt') to approve jobs"
+            "💡 Use job_client.jobs[0].accept_by_depositing_result('file_or_folder') to approve jobs"
         )
 
         return "\n".join(lines)
@@ -952,7 +960,7 @@ class JobsList:
         html += """
                 </div>
                 <div class="syftjob-hint">
-                    💡 Use <code class="syftjob-code">jobs[0].accept_by_depositing_result('file.txt')</code> to complete jobs
+                    💡 Use <code class="syftjob-code">jobs[0].accept_by_depositing_result('file_or_folder')</code> to complete jobs
                 </div>
             </div>
         </div>
@@ -1100,15 +1108,15 @@ class JobClient:
         return JobsList(current_jobs, self.config.email)
 
 
-def get_client(config_path: str) -> JobClient:
+def get_client(syftbox_folder_path: str) -> JobClient:
     """
-    Factory function to create a JobClient from config file.
+    Factory function to create a JobClient from SyftBox folder.
 
     Args:
-        config_path: Path to the configuration JSON file
+        syftbox_folder_path: Path to the SyftBox_{email} folder
 
     Returns:
         Configured JobClient instance
     """
-    config = SyftJobConfig.from_file(config_path)
+    config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path)
     return JobClient(config)

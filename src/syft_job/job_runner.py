@@ -207,16 +207,16 @@ class SyftJobRunner:
             raise
 
 
-def create_runner(config_path: str, poll_interval: int = 5) -> SyftJobRunner:
+def create_runner(syftbox_folder_path: str, poll_interval: int = 5) -> SyftJobRunner:
     """
-    Factory function to create a SyftJobRunner from config file.
+    Factory function to create a SyftJobRunner from SyftBox folder.
 
     Args:
-        config_path: Path to the configuration JSON file
+        syftbox_folder_path: Path to the SyftBox_{email} folder
         poll_interval: How often to check for new jobs (in seconds)
 
     Returns:
         Configured SyftJobRunner instance
     """
-    config = SyftJobConfig.from_file(config_path)
+    config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path)
     return SyftJobRunner(config, poll_interval)

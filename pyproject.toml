@@ -20,7 +20,7 @@ syft-job = "syft_job:main"
 syft-job-runner = "syft_job.runner_main:main"
 
 [tool.uv.sources]
-"syft-client" = { git = "https://github.com/OpenMined/syft-client" , branch = "main" }
+"syft-client" = { git = "https://github.com/OpenMined/syft-client" , branch = "andrew_refactor_4" }
 
 [build-system]
 requires = ["hatchling"]

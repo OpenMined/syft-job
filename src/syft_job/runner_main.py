@@ -18,16 +18,18 @@ def main():
         epilog="""
 Examples:
   # Start monitoring jobs
-  syft-job-runner --config config.json
+  syft-job-runner --syftbox-folder /path/to/SyftBox_user@example.com
 
   # Reset all jobs and recreate folder structure
-  syft-job-runner --config config.json --reset
+  syft-job-runner --syftbox-folder /path/to/SyftBox_user@example.com --reset
 
   # Reset and then start monitoring
-  syft-job-runner --config config.json --reset --run
+  syft-job-runner --syftbox-folder /path/to/SyftBox_user@example.com --reset --run
         """,
     )
-    parser.add_argument("--config", required=True, help="Path to the config.json file")
+    parser.add_argument(
+        "--syftbox-folder", required=True, help="Path to the SyftBox_{email} folder"
+    )
     parser.add_argument(
         "--poll-interval",
         type=int,
@@ -47,13 +49,17 @@ Examples:
 
     args = parser.parse_args()
 
-    config_path = Path(args.config).expanduser().resolve()
-    if not config_path.exists():
-        print(f"❌ Error: Config file not found: {config_path}")
+    syftbox_folder_path = Path(args.syftbox_folder).expanduser().resolve()
+    if not syftbox_folder_path.exists():
+        print(f"❌ Error: SyftBox folder not found: {syftbox_folder_path}")
+        sys.exit(1)
+
+    if not syftbox_folder_path.is_dir():
+        print(f"❌ Error: Path is not a directory: {syftbox_folder_path}")
         sys.exit(1)
 
     try:
-        runner = create_runner(str(config_path), args.poll_interval)
+        runner = create_runner(str(syftbox_folder_path), args.poll_interval)
 
         # Handle reset flag
         if args.reset:

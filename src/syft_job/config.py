@@ -1,4 +1,4 @@
-import json
+import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -7,28 +7,47 @@ from pydantic import BaseModel, Field
 class SyftJobConfig(BaseModel):
     """Configuration for SyftJob system."""
 
-    data_dir: str = Field(..., description="Root directory for SyftBox data")
-    email: str = Field(..., description="User email address")
-    server_url: str = Field(..., description="Server URL")
-    refresh_token: str = Field(..., description="Authentication refresh token")
+    syftbox_folder: str = Field(..., description="Path to SyftBox_{email} folder")
+    email: str = Field(..., description="User email address extracted from folder name")
+    server_url: str = Field(default="", description="Server URL (optional)")
+    refresh_token: str = Field(
+        default="", description="Authentication refresh token (optional)"
+    )
+
+    @classmethod
+    def from_syftbox_folder(cls, syftbox_folder_path: str) -> "SyftJobConfig":
+        """Load configuration from SyftBox folder path."""
+        syftbox_path = Path(syftbox_folder_path).expanduser().resolve()
+
+        if not syftbox_path.exists():
+            raise FileNotFoundError(f"SyftBox folder not found: {syftbox_folder_path}")
+
+        if not syftbox_path.is_dir():
+            raise ValueError(f"Path is not a directory: {syftbox_folder_path}")
+
+        # Extract email from folder name (SyftBox_{email})
+        folder_name = syftbox_path.name
+        match = re.match(r"^SyftBox_(.+)$", folder_name)
+        if not match:
+            raise ValueError(
+                f"Invalid SyftBox folder name format. Expected 'SyftBox_{{email}}', got: {folder_name}"
+            )
+
+        email = match.group(1)
+
+        return cls(syftbox_folder=str(syftbox_path), email=email)
 
     @classmethod
     def from_file(cls, config_path: str) -> "SyftJobConfig":
-        """Load configuration from JSON file."""
-        config_path_obj = Path(config_path).expanduser().resolve()
-
-        if not config_path_obj.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
-
-        with open(config_path_obj, "r") as f:
-            config_data = json.load(f)
-
-        return cls(**config_data)
+        """Deprecated: Load configuration from JSON file. Use from_syftbox_folder instead."""
+        raise DeprecationWarning(
+            "from_file is deprecated. Use from_syftbox_folder instead."
+        )
 
     @property
     def datasites_dir(self) -> Path:
         """Get the datasites directory path."""
-        return Path(self.data_dir) / "datasites"
+        return Path(self.syftbox_folder) / "datasites"
 
     def get_user_dir(self, user_email: str) -> Path:
         """Get the directory path for a specific user."""
