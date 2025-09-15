@@ -3,9 +3,6 @@ name = "syft-job"
 version = "0.1.0"
 description = "A generic job submission system for data science workflows with syft:// URL support"
 readme = "README.md"
-authors = [
-    { name = "rasswanth-s", email = "43314053+rasswanth-s@users.noreply.github.com" }
-]
 requires-python = ">=3.12"
 dependencies = [
     "ipykernel>=6.30.1",
