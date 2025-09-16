@@ -1257,7 +1257,7 @@ wheels = [
 [[package]]
 name = "syft-client"
 version = "0.1.6"
-source = { git = "https://github.com/OpenMined/syft-client?branch=andrew_refactor_4#4ca2db8fea0e0a9fcdbc5b8aa0742a7a0f5496d3" }
+source = { git = "https://github.com/OpenMined/syft-client?branch=rasswanth%2Fjobs_api#0e60d4f36f9d71489cc923d865511096dbcd4e53" }
 dependencies = [
     { name = "cryptography" },
     { name = "dnspython" },
@@ -1284,7 +1284,7 @@ wheels = [
 
 [[package]]
 name = "syft-job"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "ipykernel" },
@@ -1308,7 +1308,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pre-commit", specifier = ">=4.3.0" },
-    { name = "syft-client", git = "https://github.com/OpenMined/syft-client?branch=andrew_refactor_4" },
+    { name = "syft-client", git = "https://github.com/OpenMined/syft-client?branch=rasswanth%2Fjobs_api" },
 ]
 
 [[package]]
