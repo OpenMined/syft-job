@@ -1,7 +1,7 @@
 import os
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import yaml
 
@@ -92,6 +92,27 @@ class JobInfo:
 
         return destination
 
+    @property
+    def output_paths(self) -> List[Path]:
+        """
+        Get list of all file paths in the outputs directory for done jobs.
+
+        Returns:
+            List of Path objects for all files/directories in outputs folder.
+            Empty list if job is not done or outputs directory doesn't exist.
+        """
+        if self.status != "done":
+            return []
+
+        outputs_dir = self.location / "outputs"
+        if not outputs_dir.exists():
+            return []
+
+        try:
+            return [item for item in outputs_dir.iterdir()]
+        except Exception:
+            return []
+
     def _repr_html_(self) -> str:
         """HTML representation for individual job display in Jupyter."""
         # Status styling
@@ -166,6 +187,25 @@ class JobInfo:
         except Exception:
             submitted_time = "Unknown"
 
+        # Generate outputs section for done jobs
+        outputs_section = ""
+        if self.status == "done":
+            output_files = self.output_paths
+            if output_files:
+                outputs_items = "\n".join(
+                    [
+                        f'                        <div class="syftjob-single-outputs-item">📄 {path.name}</div>'
+                        for path in output_files
+                    ]
+                )
+                outputs_section = f"""
+                <div class="syftjob-single-outputs">
+                    <h4>📁 Outputs ({len(output_files)} files)</h4>
+                    <div class="syftjob-single-outputs-list">
+{outputs_items}
+                    </div>
+                </div>"""
+
         return f"""
         <style>
             .syftjob-single {{
@@ -235,6 +275,31 @@ class JobInfo:
                 max-height: 200px;
                 line-height: 1.4;
             }}
+            .syftjob-single-outputs {{
+                margin-top: 16px;
+                padding: 12px;
+                background: #f8f9fa;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+            }}
+            .syftjob-single-outputs h4 {{
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                color: #2d3748;
+                font-weight: 600;
+            }}
+            .syftjob-single-outputs-list {{
+                font-family: 'Monaco', 'Menlo', monospace;
+                font-size: 12px;
+                color: #4a5568;
+                line-height: 1.5;
+                margin: 0;
+                list-style: none;
+                padding: 0;
+            }}
+            .syftjob-single-outputs-item {{
+                padding: 2px 0;
+            }}
 
             /* Dark theme */
             @media (prefers-color-scheme: dark) {{
@@ -291,6 +356,19 @@ class JobInfo:
                 border-color: #4a5568;
                 color: #e2e8f0;
             }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-outputs,
+            body[data-jp-theme-light="false"] .syftjob-single-outputs {{
+                background: #2d3748;
+                border-color: #4a5568;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-outputs h4,
+            body[data-jp-theme-light="false"] .syftjob-single-outputs h4 {{
+                color: #e2e8f0;
+            }}
+            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-outputs-list,
+            body[data-jp-theme-light="false"] .syftjob-single-outputs-list {{
+                color: #cbd5e0;
+            }}
         </style>
         <div class="syftjob-single">
             <div class="syftjob-single-header">
@@ -320,7 +398,7 @@ class JobInfo:
                     <strong>Script:</strong>
                     <div class="syftjob-single-script">{script_content}</div>
                 </div>
-            </div>
+            </div>{outputs_section}
         </div>
         """
 
@@ -972,9 +1050,23 @@ class JobsList:
 class JobClient:
     """Client for submitting jobs to SyftBox."""
 
-    def __init__(self, config: SyftJobConfig):
-        """Initialize JobClient with configuration."""
+    def __init__(self, config: SyftJobConfig, user_email: Optional[str] = None):
+        """Initialize JobClient with configuration and optional user email for job views."""
         self.config = config
+        self.root_email = config.email  # From SyftBox folder (for "submitted_by")
+        self.user_email = user_email or config.email  # Target user for job views
+
+        # Validate that user_email exists in datasites
+        self._validate_user_email()
+
+    def _validate_user_email(self) -> None:
+        """Validate that the user_email directory exists in datasites."""
+        user_dir = self.config.get_user_dir(self.user_email)
+        if not user_dir.exists():
+            raise ValueError(
+                f"User directory does not exist: {user_dir}. "
+                f"User '{self.user_email}' not found in datasites."
+            )
 
     def _ensure_job_directories(self, user_email: str) -> None:
         """Ensure job directory structure exists for a user."""
@@ -1035,7 +1127,7 @@ class JobClient:
 
         job_config = {
             "name": job_name,
-            "submitted_by": self.config.email,
+            "submitted_by": self.root_email,
             "submitted_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -1045,10 +1137,9 @@ class JobClient:
         return job_dir
 
     def _get_current_user_jobs(self) -> List[JobInfo]:
-        """Get all jobs in the current user's datasite (inbox, approved, done)."""
+        """Get all jobs in the target user's datasite (inbox, approved, done)."""
         jobs: list[JobInfo] = []
-        current_user_email = self.config.email
-        user_job_dir = self.config.get_job_dir(current_user_email)
+        user_job_dir = self.config.get_job_dir(self.user_email)
 
         if not user_job_dir.exists():
             return jobs
@@ -1076,7 +1167,7 @@ class JobClient:
                     jobs.append(
                         JobInfo(
                             name=job_config.get("name", job_dir.name),
-                            user=current_user_email,
+                            user=self.user_email,
                             status=status_dir_name,
                             submitted_by=job_config.get("submitted_by", "unknown"),
                             location=job_dir,
@@ -1092,7 +1183,7 @@ class JobClient:
     @property
     def jobs(self) -> JobsList:
         """
-        Get all jobs in the current user's datasite as an indexable list.
+        Get all jobs in the target user's datasite as an indexable list.
 
         Returns a JobsList object that can be:
         - Indexed: jobs[0], jobs[1], etc.
@@ -1102,21 +1193,22 @@ class JobClient:
         Each job has an accept_by_depositing_result() method for approval.
 
         Returns:
-            JobsList containing all jobs in current user's datasite
+            JobsList containing all jobs in target user's datasite
         """
         current_jobs = self._get_current_user_jobs()
-        return JobsList(current_jobs, self.config.email)
+        return JobsList(current_jobs, self.user_email)
 
 
-def get_client(syftbox_folder_path: str) -> JobClient:
+def get_client(syftbox_folder_path: str, user_email: Optional[str] = None) -> JobClient:
     """
     Factory function to create a JobClient from SyftBox folder.
 
     Args:
-        syftbox_folder_path: Path to the SyftBox_{email} folder
+        syftbox_folder_path: Path to the SyftBox_{root_email} folder
+        user_email: Optional target user email for job views (defaults to root_email)
 
     Returns:
         Configured JobClient instance
     """
     config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path)
-    return JobClient(config)
+    return JobClient(config, user_email)
