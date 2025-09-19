@@ -19,6 +19,7 @@ class JobInfo:
         submitted_by: str,
         location: Path,
         config: SyftJobConfig,
+        root_email: str,
     ):
         self.name = name
         self.user = user
@@ -26,6 +27,7 @@ class JobInfo:
         self.submitted_by = submitted_by
         self.location = location
         self._config = config
+        self._root_email = root_email
 
     def __str__(self) -> str:
         status_emojis = {"inbox": "📥", "approved": "✅", "done": "🎉"}
@@ -91,6 +93,40 @@ class JobInfo:
         self.location = done_dir
 
         return destination
+
+    def approve(self) -> None:
+        """
+        Approve a job by moving it from inbox to approved status.
+        Only the admin user can approve jobs in their own folder.
+
+        Raises:
+            ValueError: If job is not in inbox status
+            PermissionError: If the current user is not authorized to approve jobs
+        """
+        if self.status != "inbox":
+            raise ValueError(
+                f"Job '{self.name}' is not in inbox status (current: {self.status})"
+            )
+
+        # Only allow admin to approve jobs in their own folder
+        if self.user != self._root_email:
+            raise PermissionError(
+                f"Only the admin user ({self._root_email}) can approve jobs in their folder. "
+                f"Current job is in {self.user}'s folder."
+            )
+
+        # Prepare approved directory path
+        approved_dir = self._config.get_approved_dir(self.user) / self.name
+
+        # Ensure the parent approved directory exists, but not the job directory itself
+        approved_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        # Move the job from inbox to approved
+        shutil.move(str(self.location), str(approved_dir))
+
+        # Update this object's state
+        self.status = "approved"
+        self.location = approved_dir
 
     @property
     def output_paths(self) -> List[Path]:
@@ -476,7 +512,7 @@ class JobsList:
 
         lines.append("")
         lines.append(
-            "💡 Use job_client.jobs[0].accept_by_depositing_result('file_or_folder') to approve jobs"
+            "💡 Use job_client.jobs[0].approve() to approve jobs or job_client.jobs[0].accept_by_depositing_result('file_or_folder') to complete jobs"
         )
 
         return "\n".join(lines)
@@ -1038,7 +1074,7 @@ class JobsList:
         html += """
                 </div>
                 <div class="syftjob-hint">
-                    💡 Use <code class="syftjob-code">jobs[0].accept_by_depositing_result('file_or_folder')</code> to complete jobs
+                    💡 Use <code class="syftjob-code">jobs[0].approve()</code> to approve jobs or <code class="syftjob-code">jobs[0].accept_by_depositing_result('file_or_folder')</code> to complete jobs
                 </div>
             </div>
         </div>
@@ -1172,6 +1208,7 @@ class JobClient:
                             submitted_by=job_config.get("submitted_by", "unknown"),
                             location=job_dir,
                             config=self.config,
+                            root_email=self.root_email,
                         )
                     )
                 except Exception:
