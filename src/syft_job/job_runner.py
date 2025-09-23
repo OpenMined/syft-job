@@ -1,4 +1,6 @@
+import os
 import shutil
+import subprocess
 import time
 from typing import List, Set
 
@@ -62,11 +64,12 @@ class SyftJobRunner:
         if run_script.exists():
             try:
                 with open(run_script, "r") as f:
-                    lines = f.readlines()[:5]  # Show first 5 lines
+                    all_lines = f.readlines()
+                lines = all_lines[:5]  # Show first 5 lines
                 print("📝 Script preview:")
                 for i, line in enumerate(lines, 1):
                     print(f"   {i}: {line.rstrip()}")
-                if len(lines) == 5 and len(f.readlines()) > 5:
+                if len(all_lines) > 5:
                     print("   ... (more lines)")
             except Exception as e:
                 print(f"   Could not read script: {e}")
@@ -174,14 +177,131 @@ class SyftJobRunner:
         # Update known jobs
         self.known_jobs = current_jobs
 
+    def _get_jobs_in_approved(self) -> List[str]:
+        """Get list of job names currently in the approved directory."""
+        approved_dir = self.config.get_approved_dir(self.config.email)
+
+        if not approved_dir.exists():
+            return []
+
+        jobs = []
+        for item in approved_dir.iterdir():
+            if item.is_dir():
+                jobs.append(item.name)
+
+        return jobs
+
+    def _execute_job(self, job_name: str) -> bool:
+        """
+        Execute run.sh for a job in the approved directory.
+
+        Args:
+            job_name: Name of the job to execute
+
+        Returns:
+            bool: True if execution was successful, False otherwise
+        """
+        approved_dir = self.config.get_approved_dir(self.config.email)
+        job_dir = approved_dir / job_name
+        run_script = job_dir / "run.sh"
+
+        if not run_script.exists():
+            print(f"❌ No run.sh found in {job_name}")
+            return False
+
+        print(f"🚀 Executing job: {job_name}")
+        print(f"📁 Job directory: {job_dir}")
+
+        try:
+            # Make run.sh executable
+            os.chmod(run_script, 0o755)
+
+            # Execute run.sh and capture output
+            result = subprocess.run(
+                ["bash", str(run_script)],
+                cwd=job_dir,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+            )
+
+            # Move job to done directory
+            done_dir = self.config.get_done_dir(self.config.email)
+            done_job_dir = done_dir / job_name
+
+            # If job already exists in done, remove it first
+            if done_job_dir.exists():
+                shutil.rmtree(done_job_dir)
+
+            shutil.move(str(job_dir), str(done_job_dir))
+
+            # Create logs directory in done job folder
+            logs_dir = done_job_dir / "logs"
+            logs_dir.mkdir(exist_ok=True)
+
+            # Write stdout to logs/stdout.txt
+            stdout_file = logs_dir / "stdout.txt"
+            with open(stdout_file, "w") as f:
+                f.write(result.stdout)
+
+            # Also write stderr if there is any
+            if result.stderr:
+                stderr_file = logs_dir / "stderr.txt"
+                with open(stderr_file, "w") as f:
+                    f.write(result.stderr)
+
+            # Write return code
+            returncode_file = logs_dir / "returncode.txt"
+            with open(returncode_file, "w") as f:
+                f.write(str(result.returncode))
+
+            if result.returncode == 0:
+                print(f"✅ Job {job_name} completed successfully")
+                print(f"📄 Output written to {stdout_file}")
+            else:
+                print(
+                    f"⚠️  Job {job_name} completed with return code {result.returncode}"
+                )
+                print(f"📄 Output written to {stdout_file}")
+                if result.stderr:
+                    print(f"📄 Error output written to {logs_dir / 'stderr.txt'}")
+
+            return True
+
+        except subprocess.TimeoutExpired:
+            print(f"⏰ Job {job_name} timed out after 5 minutes")
+            return False
+        except Exception as e:
+            print(f"❌ Error executing job {job_name}: {e}")
+            return False
+
+    def process_approved_jobs(self) -> None:
+        """Process all jobs in the approved directory."""
+        approved_jobs = self._get_jobs_in_approved()
+
+        if not approved_jobs:
+            return
+
+        print(f"📋 Found {len(approved_jobs)} job(s) in approved directory")
+
+        for job_name in approved_jobs:
+            print(f"\n{'='*50}")
+            self._execute_job(job_name)
+            print(f"{'='*50}")
+
+        if approved_jobs:
+            print(f"\n✅ Processed {len(approved_jobs)} job(s)")
+
     def run(self) -> None:
-        """Start monitoring the inbox folder for new jobs."""
+        """Start monitoring the inbox and approved folders for jobs."""
         root_email = self.config.email
         inbox_dir = self.config.get_inbox_dir(root_email)
+        approved_dir = self.config.get_approved_dir(root_email)
 
         print("🚀 SyftJob Runner started")
         print(f"👤 Monitoring jobs for: {root_email}")
         print(f"📂 Inbox directory: {inbox_dir}")
+        print(f"📂 Approved directory: {approved_dir}")
         print(f"⏱️  Poll interval: {self.poll_interval} seconds")
         print("⏹️  Press Ctrl+C to stop")
         print("=" * 50)
@@ -199,6 +319,7 @@ class SyftJobRunner:
         try:
             while True:
                 self.check_for_new_jobs()
+                self.process_approved_jobs()
                 time.sleep(self.poll_interval)
         except KeyboardInterrupt:
             print("\n🛑 Job runner stopped by user")
