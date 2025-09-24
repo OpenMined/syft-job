@@ -1461,6 +1461,127 @@ class JobClient:
 
         return job_dir
 
+    def submit_python_job(
+        self,
+        user: str,
+        job_name: str,
+        code_path: str,
+        entry_point: Optional[str] = None,
+    ) -> Path:
+        """
+        Submit a Python job for a user.
+
+        Args:
+            user: Email address of the user to submit job for
+            job_name: Name of the job (will be used as directory name)
+            code_path: Path to Python file or directory containing Python code
+            entry_point: Python file to execute (required if code_path is a directory)
+
+        Returns:
+            Path to the created job directory
+
+        Raises:
+            FileExistsError: If job with same name already exists
+            ValueError: If user directory doesn't exist, or if code_path is a directory without entry_point
+            FileNotFoundError: If code_path doesn't exist or entry_point doesn't exist in directory
+        """
+        # Validate code_path exists
+        code_path_obj = Path(code_path).expanduser().resolve()
+        if not code_path_obj.exists():
+            raise FileNotFoundError(f"Code path does not exist: {code_path}")
+
+        # Validate entry_point requirements
+        if code_path_obj.is_dir():
+            if not entry_point:
+                raise ValueError(
+                    "entry_point parameter is required when code_path is a directory"
+                )
+            # Validate entry_point exists in the directory
+            entry_point_path = code_path_obj / entry_point
+            if not entry_point_path.exists():
+                raise FileNotFoundError(
+                    f"Entry point '{entry_point}' not found in directory '{code_path}'"
+                )
+            if not entry_point_path.is_file():
+                raise ValueError(f"Entry point '{entry_point}' is not a file")
+        elif code_path_obj.is_file():
+            # If code_path is a file and no entry_point provided, use the filename
+            if not entry_point:
+                entry_point = code_path_obj.name
+        else:
+            raise ValueError(f"Code path is neither a file nor directory: {code_path}")
+
+        # Ensure user directory exists
+        user_dir = self.config.get_user_dir(user)
+        if not user_dir.exists():
+            raise ValueError(f"User directory does not exist: {user_dir}")
+
+        # Ensure job directory structure exists
+        self._ensure_job_directories(user)
+
+        # Create job directory in inbox
+        job_dir = self.config.get_inbox_dir(user) / job_name
+
+        if job_dir.exists():
+            raise FileExistsError(
+                f"Job '{job_name}' already exists in inbox for user '{user}'"
+            )
+
+        job_dir.mkdir(parents=True)
+
+        # Create code directory in job
+        code_dir = job_dir / "code"
+        code_dir.mkdir()
+
+        # Copy code to job directory
+        if code_path_obj.is_file():
+            # Copy single file
+            destination = code_dir / code_path_obj.name
+            shutil.copy2(str(code_path_obj), str(destination))
+        else:
+            # Copy entire directory contents
+            for item in code_path_obj.iterdir():
+                if item.is_file():
+                    shutil.copy2(str(item), str(code_dir / item.name))
+                elif item.is_dir():
+                    shutil.copytree(str(item), str(code_dir / item.name))
+
+        # Generate bash script for Python execution
+        bash_script = f"""#!/bin/bash
+
+# Navigate to code directory
+cd code
+
+# Execute Python script
+python3 {entry_point}
+"""
+
+        # Create run.sh file
+        run_script_path = job_dir / "run.sh"
+        with open(run_script_path, "w") as f:
+            f.write(bash_script)
+
+        # Make run.sh executable
+        os.chmod(run_script_path, 0o755)
+
+        # Create config.yaml file
+        config_yaml_path = job_dir / "config.yaml"
+        from datetime import datetime, timezone
+
+        job_config = {
+            "name": job_name,
+            "submitted_by": self.root_email,
+            "submitted_at": datetime.now(timezone.utc).isoformat(),
+            "type": "python",
+            "code_path": str(code_path_obj),
+            "entry_point": entry_point,
+        }
+
+        with open(config_yaml_path, "w") as f:
+            yaml.dump(job_config, f, default_flow_style=False)
+
+        return job_dir
+
     def _get_current_user_jobs(self) -> List[JobInfo]:
         """Get all jobs in the target user's datasite (inbox, approved, done)."""
         jobs: list[JobInfo] = []
