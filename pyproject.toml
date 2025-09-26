@@ -22,7 +22,7 @@ syft-job = "syft_job:main"
 syft-job-runner = "syft_job.runner_main:main"
 
 [tool.uv.sources]
-"syft-client" = { git = "https://github.com/OpenMined/syft-client" , branch = "rasswanth/jobs_api" }
+"syft-client" = { git = "https://github.com/OpenMined/syft-client" , branch = "main" }
 
 [build-system]
 requires = ["hatchling"]
