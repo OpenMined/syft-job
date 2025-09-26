@@ -9,10 +9,6 @@ class SyftJobConfig(BaseModel):
 
     syftbox_folder: str = Field(..., description="Path to SyftBox_{email} folder")
     email: str = Field(..., description="User email address extracted from folder name")
-    server_url: str = Field(default="", description="Server URL (optional)")
-    refresh_token: str = Field(
-        default="", description="Authentication refresh token (optional)"
-    )
 
     @classmethod
     def from_syftbox_folder(cls, syftbox_folder_path: str) -> "SyftJobConfig":
