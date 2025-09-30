@@ -1,5 +1,6 @@
 import os
 import re
+import time 
 import shutil
 from pathlib import Path
 from typing import List, Optional
@@ -1388,10 +1389,10 @@ class JobClient:
         """Validate that the user_email directory exists in datasites."""
         user_dir = self.config.get_user_dir(self.user_email)
         if not user_dir.exists():
-            raise ValueError(
-                f"User directory does not exist: {user_dir}. "
-                f"User '{self.user_email}' not found in datasites."
-            )
+            # Create user directory if it doesn't exist
+            user_dir.mkdir(parents=True, exist_ok=True)
+            if self.verbose:
+                print(f"Created user directory: {user_dir}")
 
     def _ensure_job_directories(self, user_email: str) -> None:
         """Ensure job directory structure exists for a user."""
@@ -1420,10 +1421,12 @@ class JobClient:
             FileExistsError: If job with same name already exists
             ValueError: If user directory doesn't exist
         """
-        # Ensure user directory exists
+        # Ensure user directory exists (create if it doesn't)
         user_dir = self.config.get_user_dir(user)
         if not user_dir.exists():
-            raise ValueError(f"User directory does not exist: {user_dir}")
+            user_dir.mkdir(parents=True, exist_ok=True)
+            if self.verbose:
+                print(f"Created user directory: {user_dir}")
 
         # Ensure job directory structure exists
         self._ensure_job_directories(user)
@@ -1445,7 +1448,7 @@ class JobClient:
 
         # Make run.sh executable
         os.chmod(run_script_path, 0o755)
-
+        
         # Create config.yaml file
         config_yaml_path = job_dir / "config.yaml"
         from datetime import datetime, timezone
@@ -1511,10 +1514,12 @@ class JobClient:
         else:
             raise ValueError(f"Code path is neither a file nor directory: {code_path}")
 
-        # Ensure user directory exists
+        # Ensure user directory exists (create if it doesn't)
         user_dir = self.config.get_user_dir(user)
         if not user_dir.exists():
-            raise ValueError(f"User directory does not exist: {user_dir}")
+            user_dir.mkdir(parents=True, exist_ok=True)
+            if self.verbose:
+                print(f"Created user directory: {user_dir}")
 
         # Ensure job directory structure exists
         self._ensure_job_directories(user)
