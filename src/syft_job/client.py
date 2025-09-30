@@ -1391,8 +1391,7 @@ class JobClient:
         if not user_dir.exists():
             # Create user directory if it doesn't exist
             user_dir.mkdir(parents=True, exist_ok=True)
-            if self.verbose:
-                print(f"Created user directory: {user_dir}")
+            print(f"Created user directory: {user_dir}")
 
     def _ensure_job_directories(self, user_email: str) -> None:
         """Ensure job directory structure exists for a user."""
@@ -1425,8 +1424,7 @@ class JobClient:
         user_dir = self.config.get_user_dir(user)
         if not user_dir.exists():
             user_dir.mkdir(parents=True, exist_ok=True)
-            if self.verbose:
-                print(f"Created user directory: {user_dir}")
+            print(f"Created user directory: {user_dir}")
 
         # Ensure job directory structure exists
         self._ensure_job_directories(user)
@@ -1518,8 +1516,7 @@ class JobClient:
         user_dir = self.config.get_user_dir(user)
         if not user_dir.exists():
             user_dir.mkdir(parents=True, exist_ok=True)
-            if self.verbose:
-                print(f"Created user directory: {user_dir}")
+            print(f"Created user directory: {user_dir}")
 
         # Ensure job directory structure exists
         self._ensure_job_directories(user)
