@@ -743,59 +743,113 @@ class JobsList:
         return iter(self._jobs)
 
     def __str__(self) -> str:
-        """Format jobs list as a nice table."""
+        """Format jobs list as separate tables grouped by user."""
         if not self._jobs:
             return "📭 No jobs found.\n"
 
-        # Calculate column widths
-        name_width = max(len(job.name) for job in self._jobs) + 2
-        status_width = max(len(job.status) for job in self._jobs) + 2
-
-        # Ensure minimum widths
-        name_width = max(name_width, 15)
-        status_width = max(status_width, 12)
+        # Group jobs by user
+        jobs_by_user: dict[str, list[JobInfo]] = {}
+        for job in self._jobs:
+            if job.user not in jobs_by_user:
+                jobs_by_user[job.user] = []
+            jobs_by_user[job.user].append(job)
 
         # Status emojis
         status_emojis = {"inbox": "📥", "approved": "✅", "done": "🎉"}
 
-        # Build table
         lines = []
-        lines.append(f"📊 Jobs for {self._root_email}")
-        lines.append("=" * (name_width + status_width + 15))
+        lines.append("📊 Jobs Overview")
+        lines.append("=" * 50)
 
-        # Header
-        header = f"{'Index':<6} {'Job Name':<{name_width}} {'Status':<{status_width}}"
-        lines.append(header)
-        lines.append("-" * len(header))
+        total_jobs = 0
+        global_status_counts: dict[str, int] = {}
 
-        # Sort jobs by status priority (inbox, approved, done) then by name
-        status_priority = {"inbox": 1, "approved": 2, "done": 3}
-        sorted_jobs = sorted(
-            self._jobs, key=lambda j: (status_priority.get(j.status, 4), j.name.lower())
-        )
+        # Sort users with root user first, then alphabetically
+        def user_sort_key(item):
+            user_email, user_jobs = item
+            if user_email == self._root_email:
+                return (0, user_email)  # Root user comes first
+            return (1, user_email)  # Others sorted alphabetically
 
-        # Job rows
-        for i, job in enumerate(sorted_jobs):
-            emoji = status_emojis.get(job.status, "❓")
-            status_display = f"{emoji} {job.status}"
-            line = f"[{i:<4}] {job.name:<{name_width}} {status_display:<{status_width}}"
-            lines.append(line)
+        sorted_users = sorted(jobs_by_user.items(), key=user_sort_key)
 
+        # Create a global job index that matches HTML display
+        job_index = 0
+
+        # Create a table for each user that has jobs
+        for user_email, user_jobs in sorted_users:
+            if not user_jobs:  # Skip users with no jobs
+                continue
+
+            total_jobs += len(user_jobs)
+
+            lines.append("")
+            lines.append(f"👤 {user_email}")
+            lines.append("-" * 60)
+
+            # Calculate column widths for this user's jobs
+            name_width = max(len(job.name) for job in user_jobs) + 2
+            status_width = max(len(job.status) for job in user_jobs) + 2
+            submitted_width = max(len(job.submitted_by) for job in user_jobs) + 2
+
+            # Ensure minimum widths
+            name_width = max(name_width, 15)
+            status_width = max(status_width, 12)
+            submitted_width = max(submitted_width, 15)
+
+            # Header
+            header = f"{'Index':<6} {'Job Name':<{name_width}} {'Submitted By':<{submitted_width}} {'Status':<{status_width}}"
+            lines.append(header)
+            lines.append("-" * len(header))
+
+            # Sort jobs by status priority (inbox, approved, done) then by name
+            status_priority = {"inbox": 1, "approved": 2, "done": 3}
+            sorted_jobs = sorted(
+                user_jobs,
+                key=lambda j: (status_priority.get(j.status, 4), j.name.lower()),
+            )
+
+            # Job rows with global indexing
+            for job in sorted_jobs:
+                emoji = status_emojis.get(job.status, "❓")
+                status_display = f"{emoji} {job.status}"
+                line = f"[{job_index:<4}] {job.name:<{name_width}} {job.submitted_by:<{submitted_width}} {status_display:<{status_width}}"
+                lines.append(line)
+                job_index += 1
+
+                # Count for global summary
+                global_status_counts[job.status] = (
+                    global_status_counts.get(job.status, 0) + 1
+                )
+
+            # User summary
+            user_status_counts: dict[str, int] = {}
+            for job in user_jobs:
+                user_status_counts[job.status] = (
+                    user_status_counts.get(job.status, 0) + 1
+                )
+
+            summary_parts = []
+            for status, count in user_status_counts.items():
+                emoji = status_emojis.get(status, "❓")
+                summary_parts.append(f"{emoji} {count} {status}")
+
+            lines.append(
+                f"📋 {user_email}: {len(user_jobs)} jobs - " + " | ".join(summary_parts)
+            )
+
+        # Global summary
         lines.append("")
-        lines.append(f"📈 Total: {len(self._jobs)} jobs")
+        lines.append("=" * 50)
+        lines.append(f"📈 Total: {total_jobs} jobs across {len(jobs_by_user)} users")
 
-        # Status summary
-        status_counts: dict[str, int] = {}
-        for job in self._jobs:
-            status_counts[job.status] = status_counts.get(job.status, 0) + 1
-
-        summary_parts = []
-        for status, count in status_counts.items():
+        global_summary_parts = []
+        for status, count in global_status_counts.items():
             emoji = status_emojis.get(status, "❓")
-            summary_parts.append(f"{emoji} {count} {status}")
+            global_summary_parts.append(f"{emoji} {count} {status}")
 
-        if summary_parts:
-            lines.append("📋 " + " | ".join(summary_parts))
+        if global_summary_parts:
+            lines.append("📋 Global: " + " | ".join(global_summary_parts))
 
         lines.append("")
         lines.append(
@@ -881,11 +935,12 @@ class JobsList:
             </div>
             """
 
-        # Sort jobs by status priority (inbox, approved, done) then by name
-        status_priority = {"inbox": 1, "approved": 2, "done": 3}
-        sorted_jobs = sorted(
-            self._jobs, key=lambda j: (status_priority.get(j.status, 4), j.name.lower())
-        )
+        # Group jobs by user
+        jobs_by_user: dict[str, list[JobInfo]] = {}
+        for job in self._jobs:
+            if job.user not in jobs_by_user:
+                jobs_by_user[job.user] = []
+            jobs_by_user[job.user].append(job)
 
         # Status styling for light and dark themes
         status_styles = {
@@ -906,451 +961,314 @@ class JobsList:
             },
         }
 
-        # Build HTML with enhanced visual appeal
+        # Calculate total counts for summary
+        total_jobs = len(self._jobs)
+        global_status_counts: dict[str, int] = {}
+        for job in self._jobs:
+            global_status_counts[job.status] = (
+                global_status_counts.get(job.status, 0) + 1
+            )
+
+        # Build HTML with clean Excel-like interface
         html = f"""
         <style>
-
-            .syftjob-container {{
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                margin: 20px 0;
-                border-radius: 8px;
-                overflow: auto;
-                max-width: 100%;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                border: 1px solid #e2e8f0;
-            }}
-
-            .syftjob-header {{
-                background: linear-gradient(135deg, #f8c073 0%, #f79763 25%, #cc677b 50%, #937098 75%, #6976ae 100%);
-                color: white;
-                padding: 20px;
-            }}
-
-            .syftjob-header h3 {{
-                margin: 0 0 8px 0;
-                font-size: 20px;
-                font-weight: 600;
-            }}
-            .syftjob-header p {{
-                margin: 0;
-                opacity: 0.9;
+            .syftjob-overview {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 16px 0;
                 font-size: 14px;
-                font-weight: 400;
+            }}
+
+            .syftjob-global-header {{
+                background: #1F2937;
+                color: white;
+                padding: 12px 16px;
+                border: 2px solid #111827;
+                text-align: center;
+                margin-bottom: 16px;
+            }}
+
+            .syftjob-global-header h3 {{
+                margin: 0 0 4px 0;
+                font-size: 16px;
+                font-weight: 700;
+            }}
+            .syftjob-global-header p {{
+                margin: 0;
+                font-size: 13px;
+                font-weight: 500;
+            }}
+
+            .syftjob-user-section {{
+                margin-bottom: 24px;
+                border: 2px solid #9CA3AF;
+            }}
+
+            .syftjob-user-header {{
+                background: #F3F4F6;
+                border-bottom: 2px solid #9CA3AF;
+                padding: 8px 12px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+
+            .syftjob-user-header h4 {{
+                margin: 0;
+                font-size: 14px;
+                font-weight: 700;
+                color: #111827;
+            }}
+
+            .syftjob-user-summary {{
+                font-size: 12px;
+                color: #374151;
+                font-weight: 600;
             }}
 
             .syftjob-table {{
                 width: 100%;
                 border-collapse: collapse;
                 background: white;
-                table-layout: auto;
-                overflow-wrap: break-word;
+                font-size: 13px;
+                border: 2px solid #6B7280;
             }}
 
             .syftjob-thead {{
-                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                background: #E5E7EB;
             }}
             .syftjob-th {{
-                padding: 18px 16px;
+                padding: 8px 12px;
                 text-align: left;
                 font-weight: 700;
-                color: #495057;
-                font-size: 14px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                border-right: 1px solid rgba(0,0,0,0.06);
-                position: relative;
+                color: #111827;
+                border-right: 2px solid #6B7280;
+                border-bottom: 2px solid #6B7280;
             }}
             .syftjob-th:last-child {{ border-right: none; }}
-            .syftjob-th::after {{
-                content: '';
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 3px;
-                background: linear-gradient(90deg, #667eea, #764ba2);
-            }}
 
             .syftjob-row-even {{
-                background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+                background: #FFFFFF;
             }}
             .syftjob-row-odd {{
-                background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+                background: #F9FAFB;
             }}
             .syftjob-row {{
-                border-bottom: 1px solid rgba(0,0,0,0.06);
-                transition: all 0.3s ease;
+                border-bottom: 1px solid #9CA3AF;
             }}
             .syftjob-row:hover {{
-                transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-                z-index: 10;
-                position: relative;
+                background: #DBEAFE !important;
             }}
 
             .syftjob-td {{
-                padding: 16px;
-                border-right: 1px solid rgba(0,0,0,0.06);
-                transition: all 0.2s ease;
+                padding: 8px 12px;
+                border-right: 1px solid #9CA3AF;
+                vertical-align: middle;
             }}
             .syftjob-td:last-child {{ border-right: none; }}
 
             .syftjob-index {{
-                background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-                padding: 8px 12px;
-                border-radius: 8px;
-                font-family: 'SF Mono', Monaco, monospace;
-                font-size: 13px;
+                background: #D1D5DB;
+                padding: 4px 8px;
+                border-radius: 3px;
+                font-family: 'Consolas', 'Courier New', monospace;
+                font-size: 11px;
                 font-weight: 700;
-                color: #495057;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                border: 1px solid rgba(0,0,0,0.1);
+                color: #111827;
+                border: 2px solid #6B7280;
+                display: inline-block;
+                min-width: 24px;
+                text-align: center;
             }}
 
             .syftjob-job-name {{
                 font-weight: 600;
-                font-size: 15px;
-                color: #2d3748;
+                color: #111827;
             }}
 
             .syftjob-status-inbox {{
-                background: #6976ae;
-                color: white;
-                padding: 4px 12px;
-                border-radius: 16px;
-                font-size: 12px;
-                font-weight: 600;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
+                background: #FBBF24;
+                color: #451A03;
+                padding: 3px 8px;
+                border: 2px solid #B45309;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                display: inline-block;
             }}
 
             .syftjob-status-approved {{
-                background: #53bea9;
-                color: white;
-                padding: 4px 12px;
-                border-radius: 16px;
-                font-size: 12px;
-                font-weight: 600;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
+                background: #60A5FA;
+                color: #1E3A8A;
+                padding: 3px 8px;
+                border: 2px solid #1D4ED8;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                display: inline-block;
             }}
 
             .syftjob-status-done {{
-                background: #937098;
-                color: white;
-                padding: 4px 12px;
-                border-radius: 16px;
-                font-size: 12px;
-                font-weight: 600;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
+                background: #34D399;
+                color: #064E3B;
+                padding: 3px 8px;
+                border: 2px solid #047857;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                display: inline-block;
             }}
 
             .syftjob-submitted {{
-                color: #718096;
-                font-size: 14px;
-                font-style: italic;
+                color: #374151;
+                font-size: 12px;
+                font-weight: 600;
             }}
 
-            .syftjob-footer {{
-                background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-                padding: 20px;
+            .syftjob-global-footer {{
+                background: #F3F4F6;
+                padding: 12px 16px;
+                text-align: center;
+                border: 2px solid #9CA3AF;
+                margin-top: 16px;
+            }}
+
+            .syftjob-global-summary {{
                 display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-top: 3px solid transparent;
-                background-clip: padding-box;
-                position: relative;
-            }}
-
-            .syftjob-footer::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 3px;
-                background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-            }}
-
-            .syftjob-summary {{
-                display: flex;
-                gap: 20px;
-                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                margin-bottom: 12px;
+                flex-wrap: wrap;
             }}
 
             .syftjob-summary-item {{
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                font-size: 15px;
+                display: inline-block;
+                font-size: 12px;
+                color: #111827;
+                padding: 4px 8px;
+                background: white;
+                border: 2px solid #6B7280;
+                border-radius: 3px;
                 font-weight: 600;
-                color: #4a5568;
-                padding: 6px 12px;
-                background: rgba(255,255,255,0.8);
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }}
 
             .syftjob-hint {{
-                font-size: 13px;
-                color: #718096;
-                text-align: right;
-                line-height: 1.5;
+                font-size: 12px;
+                color: #374151;
+                line-height: 1.4;
+                margin-top: 8px;
+                font-weight: 500;
             }}
 
             .syftjob-code {{
-                background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-family: 'SF Mono', Monaco, monospace;
+                background: #E5E7EB;
+                padding: 2px 4px;
+                border-radius: 3px;
+                font-family: 'Consolas', 'Courier New', monospace;
+                font-size: 11px;
+                border: 2px solid #6B7280;
                 font-weight: 600;
-                border: 1px solid rgba(0,0,0,0.1);
+                color: #111827;
             }}
 
-            /* Dark theme styles */
-            @media (prefers-color-scheme: dark) {{
-                .syftjob-container {{
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    border-color: #4a5568;
-                }}
-
-                .syftjob-header {{
-                    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-                }}
-
-                .syftjob-table {{
-                    background: #1a202c;
-                }}
-
-                .syftjob-thead {{
-                    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-                }}
-                .syftjob-th {{
-                    color: #e2e8f0;
-                    border-right-color: rgba(255,255,255,0.1);
-                }}
-                .syftjob-th::after {{
-                    background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-                }}
-
-                .syftjob-row-even {{
-                    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-                }}
-                .syftjob-row-odd {{
-                    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-                }}
-                .syftjob-row {{
-                    border-bottom-color: rgba(255,255,255,0.1);
-                }}
-                .syftjob-row:hover {{
-                    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-                }}
-
-                .syftjob-td {{
-                    border-right-color: rgba(255,255,255,0.1);
-                }}
-
-                .syftjob-index {{
-                    background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
-                    color: #e2e8f0;
-                    border-color: rgba(255,255,255,0.2);
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                }}
-                .syftjob-job-name {{ color: #e2e8f0; }}
-                .syftjob-submitted {{ color: #a0aec0; }}
-
-                .syftjob-status-inbox {{
-                    background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
-                    color: #e2e8f0;
-                    box-shadow: 0 2px 8px rgba(74, 85, 104, 0.3);
-                }}
-                .syftjob-status-approved {{
-                    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-                    color: #c6f6d5;
-                    box-shadow: 0 2px 8px rgba(56, 161, 105, 0.3);
-                }}
-                .syftjob-status-done {{
-                    background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
-                    color: #e9d8fd;
-                    box-shadow: 0 2px 8px rgba(128, 90, 213, 0.3);
-                }}
-
-                .syftjob-footer {{
-                    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-                }}
-                .syftjob-footer::before {{
-                    background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-                }}
-
-                .syftjob-summary-item {{
-                    background: rgba(45, 55, 72, 0.8);
-                    color: #e2e8f0;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                }}
-
-                .syftjob-hint {{ color: #a0aec0; }}
-                .syftjob-code {{
-                    background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
-                    color: #e2e8f0;
-                    border-color: rgba(255,255,255,0.2);
-                }}
-            }}
-
-            /* Jupyter-specific dark theme detection */
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-header,
-            body[data-jp-theme-light="false"] .syftjob-header {{
-                background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-table,
-            body[data-jp-theme-light="false"] .syftjob-table {{
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-thead,
-            body[data-jp-theme-light="false"] .syftjob-thead {{
-                background: #2d3748; border-bottom-color: #4a5568;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-th,
-            body[data-jp-theme-light="false"] .syftjob-th {{
-                color: #e2e8f0; border-right-color: #4a5568;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-row-even,
-            body[data-jp-theme-light="false"] .syftjob-row-even {{
-                background: #1a202c;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-row-odd,
-            body[data-jp-theme-light="false"] .syftjob-row-odd {{
-                background: #2d3748;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-row,
-            body[data-jp-theme-light="false"] .syftjob-row {{
-                border-bottom-color: #4a5568;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-td,
-            body[data-jp-theme-light="false"] .syftjob-td {{
-                border-right-color: #4a5568;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-index,
-            body[data-jp-theme-light="false"] .syftjob-index {{
-                background: #4a5568; color: #e2e8f0;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-job-name,
-            body[data-jp-theme-light="false"] .syftjob-job-name {{
-                color: #e2e8f0;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-submitted,
-            body[data-jp-theme-light="false"] .syftjob-submitted {{
-                color: #a0aec0;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-inbox,
-            body[data-jp-theme-light="false"] .syftjob-status-inbox {{
-                background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
-                color: #e2e8f0;
-                box-shadow: 0 2px 8px rgba(74, 85, 104, 0.3);
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-approved,
-            body[data-jp-theme-light="false"] .syftjob-status-approved {{
-                background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-                color: #c6f6d5;
-                box-shadow: 0 2px 8px rgba(56, 161, 105, 0.3);
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-status-done,
-            body[data-jp-theme-light="false"] .syftjob-status-done {{
-                background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
-                color: #e9d8fd;
-                box-shadow: 0 2px 8px rgba(128, 90, 213, 0.3);
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-footer,
-            body[data-jp-theme-light="false"] .syftjob-footer {{
-                background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-                border-top-color: rgba(147,112,152,0.3);
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-hint,
-            body[data-jp-theme-light="false"] .syftjob-hint {{
-                color: #a0aec0;
-            }}
-
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-code,
-            body[data-jp-theme-light="false"] .syftjob-code {{
-                background: #4a5568; color: #e2e8f0;
-            }}
         </style>
 
-        <div class="syftjob-container">
-            <div class="syftjob-header">
-                <h3>📊 Jobs for {self._root_email}</h3>
-                <p>Total: {len(self._jobs)} jobs</p>
+        <div class="syftjob-overview">
+            <div class="syftjob-global-header">
+                <h3>📊 Jobs Overview</h3>
+                <p>Total: {total_jobs} jobs across {len(jobs_by_user)} users</p>
             </div>
-            <table class="syftjob-table">
-                <thead class="syftjob-thead">
-                    <tr>
-                        <th class="syftjob-th">Index</th>
-                        <th class="syftjob-th">Job Name</th>
-                        <th class="syftjob-th">Status</th>
-                        <th class="syftjob-th">Submitted By</th>
-                    </tr>
-                </thead>
-                <tbody>
         """
 
-        # Add job rows
-        for i, job in enumerate(sorted_jobs):
-            style_info = status_styles.get(job.status, {"emoji": "❓"})
-            row_class = "syftjob-row-even" if i % 2 == 0 else "syftjob-row-odd"
+        # Create a separate table for each user that has jobs
+        # Sort users with root user first, then alphabetically
+        def user_sort_key(item):
+            user_email, user_jobs = item
+            if user_email == self._root_email:
+                return (0, user_email)  # Root user comes first
+            return (1, user_email)  # Others sorted alphabetically
+
+        sorted_users = sorted(jobs_by_user.items(), key=user_sort_key)
+
+        job_index = 0
+        for user_email, user_jobs in sorted_users:
+            if not user_jobs:  # Skip users with no jobs
+                continue
+
+            # Sort jobs by status priority (inbox, approved, done) then by name
+            status_priority = {"inbox": 1, "approved": 2, "done": 3}
+            sorted_user_jobs = sorted(
+                user_jobs,
+                key=lambda j: (status_priority.get(j.status, 4), j.name.lower()),
+            )
+
+            # Calculate user summary
+            user_status_counts: dict[str, int] = {}
+            for job in user_jobs:
+                user_status_counts[job.status] = (
+                    user_status_counts.get(job.status, 0) + 1
+                )
+
+            user_summary_parts = []
+            for status, count in user_status_counts.items():
+                emoji = status_styles.get(status, {}).get("emoji", "❓")
+                user_summary_parts.append(f"{emoji} {count} {status}")
 
             html += f"""
-                    <tr class="{row_class} syftjob-row">
-                        <td class="syftjob-td">
-                            <span class="syftjob-index">[{i}]</span>
-                        </td>
-                        <td class="syftjob-td syftjob-job-name">
-                            {job.name}
-                        </td>
-                        <td class="syftjob-td">
-                            <span class="syftjob-status-{job.status}">
-                                {style_info['emoji']} {job.status.upper()}
-                            </span>
-                        </td>
-                        <td class="syftjob-td syftjob-submitted">
-                            {job.submitted_by}
-                        </td>
-                    </tr>
+            <div class="syftjob-user-section">
+                <div class="syftjob-user-header">
+                    <h4>👤 {user_email}</h4>
+                    <div class="syftjob-user-summary">{len(user_jobs)} jobs - {" | ".join(user_summary_parts)}</div>
+                </div>
+                <table class="syftjob-table">
+                    <thead class="syftjob-thead">
+                        <tr>
+                            <th class="syftjob-th">Index</th>
+                            <th class="syftjob-th">Job Name</th>
+                            <th class="syftjob-th">Submitted By</th>
+                            <th class="syftjob-th">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             """
 
+            # Add job rows for this user
+            for i, job in enumerate(sorted_user_jobs):
+                style_info = status_styles.get(job.status, {"emoji": "❓"})
+                row_class = "syftjob-row-even" if i % 2 == 0 else "syftjob-row-odd"
+
+                html += f"""
+                        <tr class="{row_class} syftjob-row">
+                            <td class="syftjob-td">
+                                <span class="syftjob-index">[{job_index}]</span>
+                            </td>
+                            <td class="syftjob-td syftjob-job-name">
+                                {job.name}
+                            </td>
+                            <td class="syftjob-td syftjob-submitted">
+                                {job.submitted_by}
+                            </td>
+                            <td class="syftjob-td">
+                                <span class="syftjob-status-{job.status}">
+                                    {style_info['emoji']} {job.status.upper()}
+                                </span>
+                            </td>
+                        </tr>
+                """
+                job_index += 1
+
+            html += """
+                    </tbody>
+                </table>
+            </div>
+            """
+
+        # Add global summary footer
         html += """
-                </tbody>
-            </table>
+            <div class="syftjob-global-footer">
+                <div class="syftjob-global-summary">
         """
 
-        # Add status summary
-        status_counts: dict[str, int] = {}
-        for job in self._jobs:
-            status_counts[job.status] = status_counts.get(job.status, 0) + 1
-
-        html += """
-            <div class="syftjob-footer">
-                <div class="syftjob-summary">
-        """
-
-        for status, count in status_counts.items():
+        for status, count in global_status_counts.items():
             style_info = status_styles.get(status, {"emoji": "❓"})
             html += f"""
                     <span class="syftjob-summary-item">
@@ -1585,68 +1503,89 @@ python {code_path_obj.name}
 
         return job_dir
 
-    def _get_current_user_jobs(self) -> List[JobInfo]:
-        """Get all jobs in the target user's datasite (inbox, approved, done)."""
+    def _get_all_jobs(self) -> List[JobInfo]:
+        """Get all jobs from all datasites (inbox, approved, done)."""
         jobs: list[JobInfo] = []
-        user_job_dir = self.config.get_job_dir(self.user_email)
+        datasites_dir = self.config.datasites_dir
 
-        if not user_job_dir.exists():
+        if not datasites_dir.exists():
             return jobs
 
-        # Check each status directory
-        for status_dir_name in ["inbox", "approved", "done"]:
-            status_dir = user_job_dir / status_dir_name
-            if not status_dir.exists():
+        # Scan through all user directories in datasites
+        for user_dir in datasites_dir.iterdir():
+            if not user_dir.is_dir():
                 continue
 
-            # Scan for job directories
-            for job_dir in status_dir.iterdir():
-                if not job_dir.is_dir():
+            user_email = user_dir.name
+            user_job_dir = self.config.get_job_dir(user_email)
+
+            if not user_job_dir.exists():
+                continue
+
+            # Check each status directory
+            for status_dir_name in ["inbox", "approved", "done"]:
+                status_dir = user_job_dir / status_dir_name
+                if not status_dir.exists():
                     continue
 
-                config_file = job_dir / "config.yaml"
-                if not config_file.exists():
-                    continue
+                # Scan for job directories
+                for job_dir in status_dir.iterdir():
+                    if not job_dir.is_dir():
+                        continue
 
-                try:
-                    with open(config_file, "r") as f:
-                        job_config = yaml.safe_load(f)
+                    config_file = job_dir / "config.yaml"
+                    if not config_file.exists():
+                        continue
 
-                    # Include all jobs in current user's datasite
-                    jobs.append(
-                        JobInfo(
-                            name=job_config.get("name", job_dir.name),
-                            user=self.user_email,
-                            status=status_dir_name,
-                            submitted_by=job_config.get("submitted_by", "unknown"),
-                            location=job_dir,
-                            config=self.config,
-                            root_email=self.root_email,
+                    try:
+                        with open(config_file, "r") as f:
+                            job_config = yaml.safe_load(f)
+
+                        # Include all jobs from all datasites
+                        jobs.append(
+                            JobInfo(
+                                name=job_config.get("name", job_dir.name),
+                                user=user_email,
+                                status=status_dir_name,
+                                submitted_by=job_config.get("submitted_by", "unknown"),
+                                location=job_dir,
+                                config=self.config,
+                                root_email=self.root_email,
+                            )
                         )
-                    )
-                except Exception:
-                    # Skip jobs with invalid config files
-                    continue
+                    except Exception:
+                        # Skip jobs with invalid config files
+                        continue
 
         return jobs
 
     @property
     def jobs(self) -> JobsList:
         """
-        Get all jobs in the target user's datasite as an indexable list.
+        Get all jobs from all datasites as an indexable list grouped by user.
 
         Returns a JobsList object that can be:
         - Indexed: jobs[0], jobs[1], etc.
         - Iterated: for job in jobs
-        - Displayed: print(jobs) shows a nice table
+        - Displayed: print(jobs) shows separate tables for each user
+        - HTML display: in Jupyter, shows separate tables for each user with jobs
 
         Each job has an accept_by_depositing_result() method for approval.
+        Only displays users that have jobs (skips empty datasites).
 
         Returns:
-            JobsList containing all jobs in target user's datasite
+            JobsList containing all jobs from all datasites, grouped by user
         """
-        current_jobs = self._get_current_user_jobs()
-        return JobsList(current_jobs, self.user_email)
+        current_jobs = self._get_all_jobs()
+
+        # Sort jobs the same way as display (root user first, then alphabetically by user, then by status/name)
+        def job_sort_key(job):
+            user_priority = 0 if job.user == self.root_email else 1
+            status_priority = {"inbox": 1, "approved": 2, "done": 3}.get(job.status, 4)
+            return (user_priority, job.user, status_priority, job.name.lower())
+
+        sorted_jobs = sorted(current_jobs, key=job_sort_key)
+        return JobsList(sorted_jobs, self.user_email)
 
 
 def get_client(syftbox_folder_path: str, user_email: Optional[str] = None) -> JobClient:
