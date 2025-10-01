@@ -1404,14 +1404,14 @@ class JobClient:
         for directory in [job_dir, inbox_dir, approved_dir, done_dir]:
             directory.mkdir(parents=True, exist_ok=True)
 
-    def submit_bash_job(self, user: str, job_name: str, script: str) -> Path:
+    def submit_bash_job(self, user: str, script: str, job_name: str = "") -> Path:
         """
         Submit a bash job for a user.
 
         Args:
             user: Email address of the user to submit job for
-            job_name: Name of the job (will be used as directory name)
             script: Bash script content to execute
+            job_name: Name of the job (will be used as directory name). If empty, defaults to "Job - <random_id>"
 
         Returns:
             Path to the created job directory
@@ -1420,6 +1420,11 @@ class JobClient:
             FileExistsError: If job with same name already exists
             ValueError: If user directory doesn't exist
         """
+        # Generate default job name if not provided
+        if not job_name.strip():
+            from uuid import uuid4
+            random_id = str(uuid4())[0:8]
+            job_name = f"Job - {random_id}"
         # Ensure user directory exists (create if it doesn't)
         user_dir = self.config.get_user_dir(user)
         if not user_dir.exists():
