@@ -431,42 +431,103 @@ class JobInfo:
         """
         return StdoutViewer(self)
 
-    def _repr_html_(self) -> str:
-        """HTML representation for individual job display in Jupyter."""
-        # Status styling
-        status_styles = {
-            "inbox": {"color": "#6976ae", "bg": "#e8f2ff", "emoji": "📥"},
-            "approved": {"color": "#53bea9", "bg": "#e6f9f4", "emoji": "✅"},
-            "done": {"color": "#937098", "bg": "#f3e5f5", "emoji": "🎉"},
-        }
+    def _get_python_syntax_highlighted_html(self, code: str) -> str:
+        """Convert Python code to syntax-highlighted HTML."""
+        # Basic Python syntax highlighting with colors
+        # Keywords
+        keywords = [
+            "and",
+            "as",
+            "assert",
+            "break",
+            "class",
+            "continue",
+            "def",
+            "del",
+            "elif",
+            "else",
+            "except",
+            "exec",
+            "finally",
+            "for",
+            "from",
+            "global",
+            "if",
+            "import",
+            "in",
+            "is",
+            "lambda",
+            "not",
+            "or",
+            "pass",
+            "print",
+            "raise",
+            "return",
+            "try",
+            "while",
+            "with",
+            "yield",
+            "True",
+            "False",
+            "None",
+        ]
 
-        style_info = status_styles.get(
-            self.status, {"color": "#718096", "bg": "#f7fafc", "emoji": "❓"}
+        # Escape HTML first
+        code = (
+            code.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#x27;")
         )
 
-        # Read job script if available
-        script_content = "No script available"
-        try:
-            script_file = self.location / "run.sh"
-            if script_file.exists():
-                with open(script_file, "r") as f:
-                    script_content = f.read().strip()
-                    # If content is too long, truncate and add ellipsis
-                    if len(script_content) > 500:
-                        script_content = script_content[:500] + "..."
-                    # Escape HTML characters
-                    script_content = (
-                        script_content.replace("&", "&amp;")
-                        .replace("<", "&lt;")
-                        .replace(">", "&gt;")
-                        .replace('"', "&quot;")
-                        .replace("'", "&#x27;")
-                    )
-        except Exception:
-            pass
+        # Apply syntax highlighting
+        import re
 
+        # Comments (lines starting with #)
+        code = re.sub(
+            r"(#.*)",
+            r'<span style="color: #6a737d; font-style: italic;">\1</span>',
+            code,
+        )
+
+        # Strings (basic handling for single and double quotes)
+        code = re.sub(
+            r"(&quot;[^&]*?&quot;)", r'<span style="color: #032f62;">\1</span>', code
+        )
+        code = re.sub(
+            r"(&#x27;[^&]*?&#x27;)", r'<span style="color: #032f62;">\1</span>', code
+        )
+
+        # Keywords
+        for keyword in keywords:
+            code = re.sub(
+                rf"\b({keyword})\b",
+                r'<span style="color: #d73a49; font-weight: bold;">\1</span>',
+                code,
+            )
+
+        # Function definitions
+        code = re.sub(
+            r"\b(def)\s+(\w+)",
+            r'<span style="color: #d73a49; font-weight: bold;">\1</span> <span style="color: #6f42c1; font-weight: bold;">\2</span>',
+            code,
+        )
+
+        # Class definitions
+        code = re.sub(
+            r"\b(class)\s+(\w+)",
+            r'<span style="color: #d73a49; font-weight: bold;">\1</span> <span style="color: #6f42c1; font-weight: bold;">\2</span>',
+            code,
+        )
+
+        return code
+
+    def _repr_html_(self) -> str:
+        """HTML representation for individual job display in Jupyter - matches jobs table styling."""
         # Read job config if available
         submitted_time = "Unknown"
+        job_type = "bash"
         try:
             config_file = self.location / "config.yaml"
             if config_file.exists():
@@ -476,6 +537,7 @@ class JobInfo:
 
                 with open(config_file, "r") as f:
                     config_data = yaml.safe_load(f)
+                    job_type = config_data.get("type", "bash")
                     submitted_at = config_data.get("submitted_at")
 
                     if submitted_at:
@@ -505,6 +567,57 @@ class JobInfo:
         except Exception:
             submitted_time = "Unknown"
 
+        # Read job script if available
+        script_content = "No script available"
+        try:
+            script_file = self.location / "run.sh"
+            if script_file.exists():
+                with open(script_file, "r") as f:
+                    script_content = f.read().strip()
+                    # If content is too long, truncate and add ellipsis
+                    if len(script_content) > 500:
+                        script_content = script_content[:500] + "..."
+                    # Escape HTML characters
+                    script_content = (
+                        script_content.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace('"', "&quot;")
+                        .replace("'", "&#x27;")
+                    )
+        except Exception:
+            pass
+
+        # Generate Code section for Python jobs
+        code_section = ""
+        if job_type == "python":
+            try:
+                # Find Python files in the job directory
+                python_files = [
+                    f
+                    for f in self.location.iterdir()
+                    if f.suffix == ".py" and f.is_file()
+                ]
+                if python_files:
+                    # Use the first Python file found
+                    py_file = python_files[0]
+                    with open(py_file, "r") as f:
+                        py_content = f.read()
+
+                    # Apply syntax highlighting
+                    highlighted_content = self._get_python_syntax_highlighted_html(
+                        py_content
+                    )
+
+                    code_section = f"""
+                <div class="syftjob-single-section">
+                    <h4>🐍 Code</h4>
+                    <div class="syftjob-single-filename">{py_file.name}</div>
+                    <div class="syftjob-single-code">{highlighted_content}</div>
+                </div>"""
+            except Exception:
+                pass
+
         # Generate outputs section for done jobs
         outputs_section = ""
         if self.status == "done":
@@ -517,7 +630,7 @@ class JobInfo:
                     ]
                 )
                 outputs_section = f"""
-                <div class="syftjob-single-outputs">
+                <div class="syftjob-single-section">
                     <h4>📁 Outputs ({len(output_files)} files)</h4>
                     <div class="syftjob-single-outputs-list">
 {outputs_items}
@@ -527,196 +640,222 @@ class JobInfo:
         return f"""
         <style>
             .syftjob-single {{
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 20px;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                border: 2px solid #9CA3AF;
                 margin: 16px 0;
                 background: white;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                max-width: 600px;
+                font-size: 14px;
+                max-width: 100%;
             }}
+
             .syftjob-single-header {{
+                background: #1F2937;
+                color: white;
+                padding: 12px 16px;
+                border-bottom: 2px solid #111827;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+
+            .syftjob-single-title {{
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                margin-bottom: 16px;
-                padding-bottom: 12px;
-                border-bottom: 1px solid #e2e8f0;
-            }}
-            .syftjob-single-status {{
-                background: {style_info['bg']};
-                color: {style_info['color']};
-                padding: 4px 12px;
-                border-radius: 16px;
-                font-size: 12px;
-                font-weight: 600;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }}
-            .syftjob-single-name {{
-                font-size: 18px;
-                font-weight: 600;
-                color: #1a202c;
+                font-size: 16px;
+                font-weight: 700;
                 margin: 0;
-                flex: 1;
             }}
+
+            .syftjob-single-status-inbox {{
+                background: #FBBF24;
+                color: #451A03;
+                padding: 4px 8px;
+                border: 2px solid #B45309;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                display: inline-block;
+            }}
+
+            .syftjob-single-status-approved {{
+                background: #60A5FA;
+                color: #1E3A8A;
+                padding: 4px 8px;
+                border: 2px solid #1D4ED8;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                display: inline-block;
+            }}
+
+            .syftjob-single-status-done {{
+                background: #34D399;
+                color: #064E3B;
+                padding: 4px 8px;
+                border: 2px solid #047857;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 700;
+                display: inline-block;
+            }}
+
+            .syftjob-single-content {{
+                padding: 16px;
+                background: white;
+            }}
+
             .syftjob-single-details {{
                 display: grid;
-                gap: 8px;
-                font-size: 14px;
-                color: #4a5568;
+                gap: 12px;
+                margin-bottom: 16px;
             }}
+
             .syftjob-single-detail {{
                 display: flex;
-                align-items: center;
-                gap: 8px;
-            }}
-            .syftjob-single-detail strong {{
-                color: #2d3748;
-                font-weight: 600;
-                min-width: 100px;
-            }}
-            .syftjob-single-script {{
-                background: #f7fafc;
-                border: 1px solid #e2e8f0;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 8px;
+                background: #F9FAFB;
+                border: 1px solid #E5E7EB;
                 border-radius: 4px;
+            }}
+
+            .syftjob-single-detail-label {{
+                color: #374151;
+                font-weight: 700;
+                min-width: 120px;
+                font-size: 13px;
+            }}
+
+            .syftjob-single-detail-value {{
+                color: #111827;
+                font-size: 13px;
+                flex: 1;
+            }}
+
+            .syftjob-single-section {{
+                margin-top: 20px;
+                border: 2px solid #E5E7EB;
+                border-radius: 4px;
+                overflow: hidden;
+            }}
+
+            .syftjob-single-section h4 {{
+                background: #F3F4F6;
+                margin: 0;
+                padding: 8px 12px;
+                font-size: 14px;
+                color: #111827;
+                font-weight: 700;
+                border-bottom: 2px solid #E5E7EB;
+            }}
+
+            .syftjob-single-script {{
+                background: #f8f9fa;
                 padding: 12px;
                 font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
-                font-size: 11px;
+                font-size: 12px;
                 color: #2d3748;
-                margin-top: 8px;
                 overflow: auto;
                 white-space: pre-wrap;
                 word-wrap: break-word;
                 max-height: 200px;
                 line-height: 1.4;
+                margin: 0;
             }}
-            .syftjob-single-outputs {{
-                margin-top: 16px;
-                padding: 12px;
-                background: #f8f9fa;
-                border: 1px solid #e2e8f0;
-                border-radius: 6px;
-            }}
-            .syftjob-single-outputs h4 {{
-                margin: 0 0 8px 0;
-                font-size: 14px;
-                color: #2d3748;
+
+            .syftjob-single-filename {{
+                background: #E5E7EB;
+                padding: 6px 12px;
+                font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
+                font-size: 11px;
+                color: #374151;
                 font-weight: 600;
+                border-bottom: 1px solid #D1D5DB;
             }}
+
+            .syftjob-single-code {{
+                background: #f8f9fa;
+                padding: 16px;
+                font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
+                font-size: 12px;
+                color: #2d3748;
+                overflow: auto;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 400px;
+                line-height: 1.5;
+                margin: 0;
+            }}
+
             .syftjob-single-outputs-list {{
+                padding: 12px;
+                background: white;
+            }}
+
+            .syftjob-single-outputs-item {{
+                padding: 4px 0;
                 font-family: 'Monaco', 'Menlo', monospace;
                 font-size: 12px;
                 color: #4a5568;
-                line-height: 1.5;
-                margin: 0;
-                list-style: none;
-                padding: 0;
-            }}
-            .syftjob-single-outputs-item {{
-                padding: 2px 0;
             }}
 
-            /* Dark theme */
-            @media (prefers-color-scheme: dark) {{
-                .syftjob-single {{
-                    background: #1a202c;
-                    border-color: #4a5568;
-                    color: #e2e8f0;
-                }}
-                .syftjob-single-header {{
-                    border-bottom-color: #4a5568;
-                }}
-                .syftjob-single-name {{
-                    color: #f7fafc;
-                }}
-                .syftjob-single-details {{
-                    color: #cbd5e0;
-                }}
-                .syftjob-single-detail strong {{
-                    color: #e2e8f0;
-                }}
-                .syftjob-single-script {{
-                    background: #2d3748;
-                    border-color: #4a5568;
-                    color: #e2e8f0;
-                }}
+            .syftjob-single-code::-webkit-scrollbar,
+            .syftjob-single-script::-webkit-scrollbar {{
+                width: 8px;
+                height: 8px;
             }}
 
-            /* Jupyter dark theme */
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single,
-            body[data-jp-theme-light="false"] .syftjob-single {{
-                background: #1a202c;
-                border-color: #4a5568;
-                color: #e2e8f0;
+            .syftjob-single-code::-webkit-scrollbar-track,
+            .syftjob-single-script::-webkit-scrollbar-track {{
+                background: #f1f1f1;
+                border-radius: 4px;
             }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-header,
-            body[data-jp-theme-light="false"] .syftjob-single-header {{
-                border-bottom-color: #4a5568;
+
+            .syftjob-single-code::-webkit-scrollbar-thumb,
+            .syftjob-single-script::-webkit-scrollbar-thumb {{
+                background: #c1c1c1;
+                border-radius: 4px;
             }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-name,
-            body[data-jp-theme-light="false"] .syftjob-single-name {{
-                color: #f7fafc;
+
+            .syftjob-single-code::-webkit-scrollbar-thumb:hover,
+            .syftjob-single-script::-webkit-scrollbar-thumb:hover {{
+                background: #a1a1a1;
             }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-details,
-            body[data-jp-theme-light="false"] .syftjob-single-details {{
-                color: #cbd5e0;
-            }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-detail strong,
-            body[data-jp-theme-light="false"] .syftjob-single-detail strong {{
-                color: #e2e8f0;
-            }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-script,
-            body[data-jp-theme-light="false"] .syftjob-single-script {{
-                background: #2d3748;
-                border-color: #4a5568;
-                color: #e2e8f0;
-            }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-outputs,
-            body[data-jp-theme-light="false"] .syftjob-single-outputs {{
-                background: #2d3748;
-                border-color: #4a5568;
-            }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-outputs h4,
-            body[data-jp-theme-light="false"] .syftjob-single-outputs h4 {{
-                color: #e2e8f0;
-            }}
-            .jp-RenderedHTMLCommon[data-jp-theme-light="false"] .syftjob-single-outputs-list,
-            body[data-jp-theme-light="false"] .syftjob-single-outputs-list {{
-                color: #cbd5e0;
-            }}
+
         </style>
         <div class="syftjob-single">
             <div class="syftjob-single-header">
-                <h3 class="syftjob-single-name">{self.name}</h3>
-                <span class="syftjob-single-status">
-                    {style_info['emoji']} {self.status.upper()}
+                <h3 class="syftjob-single-title">📋 {self.name}</h3>
+                <span class="syftjob-single-status-{self.status}">
+                    {'📥' if self.status == 'inbox' else '✅' if self.status == 'approved' else '🎉'} {self.status.upper()}
                 </span>
             </div>
-            <div class="syftjob-single-details">
-                <div class="syftjob-single-detail">
-                    <strong>User:</strong>
-                    <span>{self.user}</span>
+            <div class="syftjob-single-content">
+                <div class="syftjob-single-details">
+                    <div class="syftjob-single-detail">
+                        <div class="syftjob-single-detail-label">User:</div>
+                        <div class="syftjob-single-detail-value">{self.user}</div>
+                    </div>
+                    <div class="syftjob-single-detail">
+                        <div class="syftjob-single-detail-label">Submitted by:</div>
+                        <div class="syftjob-single-detail-value">{self.submitted_by}</div>
+                    </div>
+                    <div class="syftjob-single-detail">
+                        <div class="syftjob-single-detail-label">Location:</div>
+                        <div class="syftjob-single-detail-value">{self.location}</div>
+                    </div>
+                    <div class="syftjob-single-detail">
+                        <div class="syftjob-single-detail-label">Submitted:</div>
+                        <div class="syftjob-single-detail-value">{submitted_time}</div>
+                    </div>
                 </div>
-                <div class="syftjob-single-detail">
-                    <strong>Submitted by:</strong>
-                    <span>{self.submitted_by}</span>
-                </div>
-                <div class="syftjob-single-detail">
-                    <strong>Location:</strong>
-                    <span>{self.location}</span>
-                </div>
-                <div class="syftjob-single-detail">
-                    <strong>Submitted:</strong>
-                    <span>{submitted_time}</span>
-                </div>
-                <div class="syftjob-single-detail">
-                    <strong>Script:</strong>
+                <div class="syftjob-single-section">
+                    <h4>📜 Script</h4>
                     <div class="syftjob-single-script">{script_content}</div>
-                </div>
-            </div>{outputs_section}
+                </div>{code_section}{outputs_section}
+            </div>
         </div>
         """
 
