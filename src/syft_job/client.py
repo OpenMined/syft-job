@@ -1,6 +1,5 @@
 import os
 import re
-import time 
 import shutil
 from pathlib import Path
 from typing import List, Optional
@@ -1423,6 +1422,7 @@ class JobClient:
         # Generate default job name if not provided
         if not job_name.strip():
             from uuid import uuid4
+
             random_id = str(uuid4())[0:8]
             job_name = f"Job - {random_id}"
         # Ensure user directory exists (create if it doesn't)
@@ -1451,7 +1451,7 @@ class JobClient:
 
         # Make run.sh executable
         os.chmod(run_script_path, 0o755)
-        
+
         # Create config.yaml file
         config_yaml_path = job_dir / "config.yaml"
         from datetime import datetime, timezone
@@ -1470,8 +1470,8 @@ class JobClient:
     def submit_python_job(
         self,
         user: str,
-        job_name: str,
         code_path: str,
+        job_name: Optional[str] = "",
         entry_point: Optional[str] = None,
     ) -> Path:
         """
@@ -1491,6 +1491,13 @@ class JobClient:
             ValueError: If user directory doesn't exist, or if code_path is a directory without entry_point
             FileNotFoundError: If code_path doesn't exist or entry_point doesn't exist in directory
         """
+        # Generate default job name if not provided
+        if not job_name:
+            from uuid import uuid4
+
+            random_id = str(uuid4())[0:8]
+            job_name = f"Job - {random_id}"
+
         # Validate code_path exists
         code_path_obj = Path(code_path).expanduser().resolve()
         if not code_path_obj.exists():
