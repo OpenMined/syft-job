@@ -30,32 +30,30 @@ class SyftJobRunner:
         """Ensure job directory structure exists for the root user."""
         root_email = self.config.email
         job_dir = self.config.get_job_dir(root_email)
-        inbox_dir = self.config.get_inbox_dir(root_email)
-        approved_dir = self.config.get_approved_dir(root_email)
-        done_dir = self.config.get_done_dir(root_email)
 
-        # Create directories if they don't exist
-        for directory in [job_dir, inbox_dir, approved_dir, done_dir]:
-            directory.mkdir(parents=True, exist_ok=True)
-            print(f"Ensured directory exists: {directory}")
+        # Create job directory if it doesn't exist
+        job_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Ensured directory exists: {job_dir}")
 
     def _get_jobs_in_inbox(self) -> List[str]:
-        """Get list of job names currently in the inbox."""
-        inbox_dir = self.config.get_inbox_dir(self.config.email)
+        """Get list of job names currently in inbox status (no status markers)."""
+        job_dir = self.config.get_job_dir(self.config.email)
 
-        if not inbox_dir.exists():
+        if not job_dir.exists():
             return []
 
         jobs = []
-        for item in inbox_dir.iterdir():
-            if item.is_dir():
-                jobs.append(item.name)
+        for item in job_dir.iterdir():
+            if item.is_dir() and (item / "config.yaml").exists():
+                # Check if job is in inbox status (no status markers)
+                if self.config.is_job_inbox(item):
+                    jobs.append(item.name)
 
         return jobs
 
     def _print_new_job(self, job_name: str) -> None:
         """Print information about a new job in the inbox."""
-        job_dir = self.config.get_inbox_dir(self.config.email) / job_name
+        job_dir = self.config.get_job_dir(self.config.email) / job_name
 
         print(f"\n🔔 NEW JOB DETECTED: {job_name}")
         print(f"📁 Location: {job_dir}")
@@ -155,16 +153,16 @@ class SyftJobRunner:
             for status, count in job_counts.items():
                 if count > 0:
                     print(f"   - {status}: {count} jobs deleted")
-            print("   - Clean folder structure recreated")
+            print("   - Clean job directory recreated")
 
         except Exception as e:
             print(f"❌ Error during reset: {e}")
-            print("🔧 Attempting to recreate folder structure anyway...")
+            print("🔧 Attempting to recreate job directory anyway...")
             try:
                 self._ensure_root_user_directories()
-                print("✅ Folder structure recreated")
+                print("✅ Job directory recreated")
             except Exception as recovery_error:
-                print(f"❌ Failed to recreate folders: {recovery_error}")
+                print(f"❌ Failed to recreate job directory: {recovery_error}")
                 raise
 
     def check_for_new_jobs(self) -> None:
@@ -179,16 +177,20 @@ class SyftJobRunner:
         self.known_jobs = current_jobs
 
     def _get_jobs_in_approved(self) -> List[str]:
-        """Get list of job names currently in the approved directory."""
-        approved_dir = self.config.get_approved_dir(self.config.email)
+        """Get list of job names currently in approved status (has .approved but not .done)."""
+        job_dir = self.config.get_job_dir(self.config.email)
 
-        if not approved_dir.exists():
+        if not job_dir.exists():
             return []
 
         jobs = []
-        for item in approved_dir.iterdir():
-            if item.is_dir():
-                jobs.append(item.name)
+        for item in job_dir.iterdir():
+            if item.is_dir() and (item / "config.yaml").exists():
+                # Check if job is in approved status
+                if self.config.is_job_approved(item) and not self.config.is_job_done(
+                    item
+                ):
+                    jobs.append(item.name)
 
         return jobs
 
@@ -203,8 +205,7 @@ class SyftJobRunner:
             bool: True if execution was successful, False otherwise
         """
         time.sleep(6)
-        approved_dir = self.config.get_approved_dir(self.config.email)
-        job_dir = approved_dir / job_name
+        job_dir = self.config.get_job_dir(self.config.email) / job_name
         run_script = job_dir / "run.sh"
 
         if not run_script.exists():
@@ -232,30 +233,23 @@ class SyftJobRunner:
                 env=env,
             )
 
-            # Move job to done directory
-            done_dir = self.config.get_done_dir(self.config.email)
-            done_job_dir = done_dir / job_name
-
-            # If job already exists in done, remove it first
-            if done_job_dir.exists():
-                shutil.rmtree(done_job_dir)
-
-            shutil.move(str(job_dir), str(done_job_dir))
+            # Create done marker file to mark job as completed
+            self.config.create_done_marker(job_dir)
 
             # Write log files directly to job root directory (flat structure)
             # Write stdout to stdout.txt
-            stdout_file = done_job_dir / "stdout.txt"
+            stdout_file = job_dir / "stdout.txt"
             with open(stdout_file, "w") as f:
                 f.write(result.stdout)
 
             # Also write stderr if there is any
             if result.stderr:
-                stderr_file = done_job_dir / "stderr.txt"
+                stderr_file = job_dir / "stderr.txt"
                 with open(stderr_file, "w") as f:
                     f.write(result.stderr)
 
             # Write return code
-            returncode_file = done_job_dir / "returncode.txt"
+            returncode_file = job_dir / "returncode.txt"
             with open(returncode_file, "w") as f:
                 f.write(str(result.returncode))
 
@@ -268,7 +262,7 @@ class SyftJobRunner:
                 )
                 print(f"📄 Output written to {stdout_file}")
                 if result.stderr:
-                    print(f"📄 Error output written to {done_job_dir / 'stderr.txt'}")
+                    print(f"📄 Error output written to {job_dir / 'stderr.txt'}")
 
             return True
 
@@ -299,13 +293,11 @@ class SyftJobRunner:
     def run(self) -> None:
         """Start monitoring the inbox and approved folders for jobs."""
         root_email = self.config.email
-        inbox_dir = self.config.get_inbox_dir(root_email)
-        approved_dir = self.config.get_approved_dir(root_email)
+        job_dir = self.config.get_job_dir(root_email)
 
         print(f"🚀 SyftJob Runner started: version: {__version__}")
         print(f"👤 Monitoring jobs for: {root_email}")
-        print(f"📂 Inbox directory: {inbox_dir}")
-        print(f"📂 Approved directory: {approved_dir}")
+        print(f"📂 Job directory: {job_dir}")
         print(f"⏱️  Poll interval: {self.poll_interval} seconds")
         print("⏹️  Press Ctrl+C to stop")
         print("=" * 50)

@@ -53,14 +53,55 @@ class SyftJobConfig(BaseModel):
         """Get the job directory path for a specific user."""
         return self.get_user_dir(user_email) / "app_data" / "job"
 
-    def get_inbox_dir(self, user_email: str) -> Path:
-        """Get the inbox directory path for a specific user."""
-        return self.get_job_dir(user_email) / "inbox"
+    def get_job_status(self, job_path: Path) -> str:
+        """
+        Get the status of a job based on marker files.
 
-    def get_approved_dir(self, user_email: str) -> Path:
-        """Get the approved directory path for a specific user."""
-        return self.get_job_dir(user_email) / "approved"
+        Args:
+            job_path: Path to the job directory
 
-    def get_done_dir(self, user_email: str) -> Path:
-        """Get the done directory path for a specific user."""
-        return self.get_job_dir(user_email) / "done"
+        Returns:
+            str: Status of the job ('inbox', 'approved', or 'done')
+        """
+        if not job_path.is_dir():
+            raise ValueError(f"Job path is not a directory: {job_path}")
+
+        # Check for status files in priority order
+        if (job_path / ".done").exists():
+            return "done"
+        elif (job_path / ".approved").exists():
+            return "approved"
+        else:
+            return "inbox"
+
+    def create_approved_marker(self, job_path: Path) -> None:
+        """
+        Create .approved marker file in job directory.
+
+        Args:
+            job_path: Path to the job directory
+        """
+        marker_file = job_path / ".approved"
+        marker_file.touch()
+
+    def create_done_marker(self, job_path: Path) -> None:
+        """
+        Create .done marker file in job directory.
+
+        Args:
+            job_path: Path to the job directory
+        """
+        marker_file = job_path / ".done"
+        marker_file.touch()
+
+    def is_job_approved(self, job_path: Path) -> bool:
+        """Check if job has been approved (has .approved file)."""
+        return (job_path / ".approved").exists()
+
+    def is_job_done(self, job_path: Path) -> bool:
+        """Check if job has been completed (has .done file)."""
+        return (job_path / ".done").exists()
+
+    def is_job_inbox(self, job_path: Path) -> bool:
+        """Check if job is still in inbox (no status markers)."""
+        return not self.is_job_approved(job_path) and not self.is_job_done(job_path)

@@ -318,7 +318,7 @@ class JobInfo:
 
     def accept_by_depositing_result(self, path: str) -> Path:
         """
-        Accept a job by depositing the result file or folder and moving it to done status.
+        Accept a job by depositing the result file or folder and creating .done marker.
 
         Args:
             path: Path to the result file or folder to deposit
@@ -327,29 +327,20 @@ class JobInfo:
             Path to the deposited result file or folder in the outputs directory
 
         Raises:
-            ValueError: If job is not in inbox status
+            ValueError: If job is not in inbox or approved status
             FileNotFoundError: If the result file or folder doesn't exist
         """
-        if self.status != "inbox":
+        if self.status not in ["inbox", "approved"]:
             raise ValueError(
-                f"Job '{self.name}' is not in inbox status (current: {self.status})"
+                f"Job '{self.name}' is not in inbox or approved status (current: {self.status})"
             )
 
         result_path = Path(path)
         if not result_path.exists():
             raise FileNotFoundError(f"Result path not found: {path}")
 
-        # Prepare done directory path
-        done_dir = self._config.get_done_dir(self.user) / self.name
-
-        # Ensure the parent done directory exists, but not the job directory itself
-        done_dir.parent.mkdir(parents=True, exist_ok=True)
-
-        # Move the job from inbox to done
-        shutil.move(str(self.location), str(done_dir))
-
-        # Create outputs directory in the done job
-        outputs_dir = done_dir / "outputs"
+        # Create outputs directory in the job directory
+        outputs_dir = self.location / "outputs"
         outputs_dir.mkdir(exist_ok=True)
 
         # Handle both files and folders
@@ -365,15 +356,23 @@ class JobInfo:
         else:
             raise ValueError(f"Path is neither a file nor a directory: {path}")
 
+        # Create done marker file (this also creates approved marker if not present)
+        self._config.create_approved_marker(self.location)
+        self._config.create_done_marker(self.location)
+
         # Update this object's state
         self.status = "done"
-        self.location = done_dir
+
+        # Show success message with checkmark
+        print(
+            f"✅ Job '{self.name}' completed successfully! Result deposited at: {destination}"
+        )
 
         return destination
 
     def approve(self) -> None:
         """
-        Approve a job by moving it from inbox to approved status.
+        Approve a job by creating .approved marker file.
         Only the admin user can approve jobs in their own folder.
 
         Raises:
@@ -392,18 +391,14 @@ class JobInfo:
                 f"Current job is in {self.user}'s folder."
             )
 
-        # Prepare approved directory path
-        approved_dir = self._config.get_approved_dir(self.user) / self.name
-
-        # Ensure the parent approved directory exists, but not the job directory itself
-        approved_dir.parent.mkdir(parents=True, exist_ok=True)
-
-        # Move the job from inbox to approved
-        shutil.move(str(self.location), str(approved_dir))
+        # Create approved marker file
+        self._config.create_approved_marker(self.location)
 
         # Update this object's state
         self.status = "approved"
-        self.location = approved_dir
+
+        # Show success message with checkmark
+        print(f"✅ Job '{self.name}' approved successfully!")
 
     @property
     def output_paths(self) -> List[Path]:
@@ -1311,13 +1306,9 @@ class JobClient:
     def _ensure_job_directories(self, user_email: str) -> None:
         """Ensure job directory structure exists for a user."""
         job_dir = self.config.get_job_dir(user_email)
-        inbox_dir = self.config.get_inbox_dir(user_email)
-        approved_dir = self.config.get_approved_dir(user_email)
-        done_dir = self.config.get_done_dir(user_email)
 
-        # Create directories if they don't exist
-        for directory in [job_dir, inbox_dir, approved_dir, done_dir]:
-            directory.mkdir(parents=True, exist_ok=True)
+        # Create job directory if it doesn't exist
+        job_dir.mkdir(parents=True, exist_ok=True)
 
     def submit_bash_job(self, user: str, script: str, job_name: str = "") -> Path:
         """
@@ -1350,13 +1341,11 @@ class JobClient:
         # Ensure job directory structure exists
         self._ensure_job_directories(user)
 
-        # Create job directory in inbox
-        job_dir = self.config.get_inbox_dir(user) / job_name
+        # Create job directory directly in job directory
+        job_dir = self.config.get_job_dir(user) / job_name
 
         if job_dir.exists():
-            raise FileExistsError(
-                f"Job '{job_name}' already exists in inbox for user '{user}'"
-            )
+            raise FileExistsError(f"Job '{job_name}' already exists for user '{user}'")
 
         job_dir.mkdir(parents=True)
 
@@ -1437,13 +1426,11 @@ class JobClient:
         # Ensure job directory structure exists
         self._ensure_job_directories(user)
 
-        # Create job directory in inbox
-        job_dir = self.config.get_inbox_dir(user) / job_name
+        # Create job directory directly in job directory
+        job_dir = self.config.get_job_dir(user) / job_name
 
         if job_dir.exists():
-            raise FileExistsError(
-                f"Job '{job_name}' already exists in inbox for user '{user}'"
-            )
+            raise FileExistsError(f"Job '{job_name}' already exists for user '{user}'")
 
         job_dir.mkdir(parents=True)
 
@@ -1522,40 +1509,37 @@ python {code_path_obj.name}
             if not user_job_dir.exists():
                 continue
 
-            # Check each status directory
-            for status_dir_name in ["inbox", "approved", "done"]:
-                status_dir = user_job_dir / status_dir_name
-                if not status_dir.exists():
+            # Scan for job directories directly in the job directory
+            for job_dir in user_job_dir.iterdir():
+                if not job_dir.is_dir():
                     continue
 
-                # Scan for job directories
-                for job_dir in status_dir.iterdir():
-                    if not job_dir.is_dir():
-                        continue
+                config_file = job_dir / "config.yaml"
+                if not config_file.exists():
+                    continue
 
-                    config_file = job_dir / "config.yaml"
-                    if not config_file.exists():
-                        continue
+                try:
+                    with open(config_file, "r") as f:
+                        job_config = yaml.safe_load(f)
 
-                    try:
-                        with open(config_file, "r") as f:
-                            job_config = yaml.safe_load(f)
+                    # Determine status from marker files
+                    status = self.config.get_job_status(job_dir)
 
-                        # Include all jobs from all datasites
-                        jobs.append(
-                            JobInfo(
-                                name=job_config.get("name", job_dir.name),
-                                user=user_email,
-                                status=status_dir_name,
-                                submitted_by=job_config.get("submitted_by", "unknown"),
-                                location=job_dir,
-                                config=self.config,
-                                root_email=self.root_email,
-                            )
+                    # Include all jobs from all datasites
+                    jobs.append(
+                        JobInfo(
+                            name=job_config.get("name", job_dir.name),
+                            user=user_email,
+                            status=status,
+                            submitted_by=job_config.get("submitted_by", "unknown"),
+                            location=job_dir,
+                            config=self.config,
+                            root_email=self.root_email,
                         )
-                    except Exception:
-                        # Skip jobs with invalid config files
-                        continue
+                    )
+                except Exception:
+                    # Skip jobs with invalid config files
+                    continue
 
         return jobs
 
