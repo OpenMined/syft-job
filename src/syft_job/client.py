@@ -318,7 +318,7 @@ class JobInfo:
 
     def accept_by_depositing_result(self, path: str) -> Path:
         """
-        Accept a job by depositing the result file or folder and creating .done marker.
+        Accept a job by depositing the result file or folder and creating done marker.
 
         Args:
             path: Path to the result file or folder to deposit
@@ -372,7 +372,7 @@ class JobInfo:
 
     def approve(self) -> None:
         """
-        Approve a job by creating .approved marker file.
+        Approve a job by creating approved marker file.
         Only the admin user can approve jobs in their own folder.
 
         Raises:

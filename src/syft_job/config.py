@@ -67,40 +67,40 @@ class SyftJobConfig(BaseModel):
             raise ValueError(f"Job path is not a directory: {job_path}")
 
         # Check for status files in priority order
-        if (job_path / ".done").exists():
+        if (job_path / "done").exists():
             return "done"
-        elif (job_path / ".approved").exists():
+        elif (job_path / "approved").exists():
             return "approved"
         else:
             return "inbox"
 
     def create_approved_marker(self, job_path: Path) -> None:
         """
-        Create .approved marker file in job directory.
+        Create approved marker file in job directory.
 
         Args:
             job_path: Path to the job directory
         """
-        marker_file = job_path / ".approved"
+        marker_file = job_path / "approved"
         marker_file.touch()
 
     def create_done_marker(self, job_path: Path) -> None:
         """
-        Create .done marker file in job directory.
+        Create done marker file in job directory.
 
         Args:
             job_path: Path to the job directory
         """
-        marker_file = job_path / ".done"
+        marker_file = job_path / "done"
         marker_file.touch()
 
     def is_job_approved(self, job_path: Path) -> bool:
-        """Check if job has been approved (has .approved file)."""
-        return (job_path / ".approved").exists()
+        """Check if job has been approved (has approved file)."""
+        return (job_path / "approved").exists()
 
     def is_job_done(self, job_path: Path) -> bool:
-        """Check if job has been completed (has .done file)."""
-        return (job_path / ".done").exists()
+        """Check if job has been completed (has done file)."""
+        return (job_path / "done").exists()
 
     def is_job_inbox(self, job_path: Path) -> bool:
         """Check if job is still in inbox (no status markers)."""

@@ -177,7 +177,7 @@ class SyftJobRunner:
         self.known_jobs = current_jobs
 
     def _get_jobs_in_approved(self) -> List[str]:
-        """Get list of job names currently in approved status (has .approved but not .done)."""
+        """Get list of job names currently in approved status (has approved but not done)."""
         job_dir = self.config.get_job_dir(self.config.email)
 
         if not job_dir.exists():
