@@ -240,23 +240,20 @@ class SyftJobRunner:
 
             shutil.move(str(job_dir), str(done_job_dir))
 
-            # Create logs directory in done job folder
-            logs_dir = done_job_dir / "logs"
-            logs_dir.mkdir(exist_ok=True)
-
-            # Write stdout to logs/stdout.txt
-            stdout_file = logs_dir / "stdout.txt"
+            # Write log files directly to job root directory (flat structure)
+            # Write stdout to stdout.txt
+            stdout_file = done_job_dir / "stdout.txt"
             with open(stdout_file, "w") as f:
                 f.write(result.stdout)
 
             # Also write stderr if there is any
             if result.stderr:
-                stderr_file = logs_dir / "stderr.txt"
+                stderr_file = done_job_dir / "stderr.txt"
                 with open(stderr_file, "w") as f:
                     f.write(result.stderr)
 
             # Write return code
-            returncode_file = logs_dir / "returncode.txt"
+            returncode_file = done_job_dir / "returncode.txt"
             with open(returncode_file, "w") as f:
                 f.write(str(result.returncode))
 
@@ -269,7 +266,7 @@ class SyftJobRunner:
                 )
                 print(f"📄 Output written to {stdout_file}")
                 if result.stderr:
-                    print(f"📄 Error output written to {logs_dir / 'stderr.txt'}")
+                    print(f"📄 Error output written to {done_job_dir / 'stderr.txt'}")
 
             return True
 

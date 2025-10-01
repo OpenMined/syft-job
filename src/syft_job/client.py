@@ -69,8 +69,7 @@ class StdoutViewer:
         if self.job_info.status != "done":
             return "No stdout available - job not completed yet"
 
-        logs_dir = self.job_info.location / "logs"
-        stdout_file = logs_dir / "stdout.txt"
+        stdout_file = self.job_info.location / "stdout.txt"
 
         if not stdout_file.exists():
             return "No stdout file found"
@@ -100,8 +99,7 @@ class StdoutViewer:
         if self.job_info.status != "done":
             error_msg = "No stdout available - job not completed yet"
         else:
-            logs_dir = self.job_info.location / "logs"
-            stdout_file = logs_dir / "stdout.txt"
+            stdout_file = self.job_info.location / "stdout.txt"
 
             if not stdout_file.exists():
                 error_msg = "No stdout file found"
@@ -1472,17 +1470,15 @@ class JobClient:
         user: str,
         code_path: str,
         job_name: Optional[str] = "",
-        entry_point: Optional[str] = None,
         dependencies: Optional[List[str]] = None,
     ) -> Path:
         """
-        Submit a Python job for a user.
+        Submit a Python job for a user (single file only).
 
         Args:
             user: Email address of the user to submit job for
             job_name: Name of the job (will be used as directory name)
-            code_path: Path to Python file or directory containing Python code
-            entry_point: Python file to execute (required if code_path is a directory)
+            code_path: Path to Python file (folders are temporarily disabled)
             dependencies: List of Python packages to install (e.g., ["numpy", "pandas==1.5.0"])
 
         Returns:
@@ -1490,8 +1486,8 @@ class JobClient:
 
         Raises:
             FileExistsError: If job with same name already exists
-            ValueError: If user directory doesn't exist, or if code_path is a directory without entry_point
-            FileNotFoundError: If code_path doesn't exist or entry_point doesn't exist in directory
+            ValueError: If code_path is not a single Python file
+            FileNotFoundError: If code_path doesn't exist
         """
         # Generate default job name if not provided
         if not job_name:
@@ -1505,26 +1501,14 @@ class JobClient:
         if not code_path_obj.exists():
             raise FileNotFoundError(f"Code path does not exist: {code_path}")
 
-        # Validate entry_point requirements
-        if code_path_obj.is_dir():
-            if not entry_point:
-                raise ValueError(
-                    "entry_point parameter is required when code_path is a directory"
-                )
-            # Validate entry_point exists in the directory
-            entry_point_path = code_path_obj / entry_point
-            if not entry_point_path.exists():
-                raise FileNotFoundError(
-                    f"Entry point '{entry_point}' not found in directory '{code_path}'"
-                )
-            if not entry_point_path.is_file():
-                raise ValueError(f"Entry point '{entry_point}' is not a file")
-        elif code_path_obj.is_file():
-            # If code_path is a file and no entry_point provided, use the filename
-            if not entry_point:
-                entry_point = code_path_obj.name
-        else:
-            raise ValueError(f"Code path is neither a file nor directory: {code_path}")
+        # Only accept single Python files (folders temporarily disabled)
+        if not code_path_obj.is_file():
+            raise ValueError(
+                f"Code path must be a single Python file. Folders are temporarily disabled: {code_path}"
+            )
+
+        if not code_path_obj.suffix == ".py":
+            raise ValueError(f"Code path must be a Python file (.py): {code_path}")
 
         # Ensure user directory exists (create if it doesn't)
         user_dir = self.config.get_user_dir(user)
@@ -1545,22 +1529,9 @@ class JobClient:
 
         job_dir.mkdir(parents=True)
 
-        # Create code directory in job
-        code_dir = job_dir / "code"
-        code_dir.mkdir()
-
-        # Copy code to job directory
-        if code_path_obj.is_file():
-            # Copy single file
-            destination = code_dir / code_path_obj.name
-            shutil.copy2(str(code_path_obj), str(destination))
-        else:
-            # Copy entire directory contents
-            for item in code_path_obj.iterdir():
-                if item.is_file():
-                    shutil.copy2(str(item), str(code_dir / item.name))
-                elif item.is_dir():
-                    shutil.copytree(str(item), str(code_dir / item.name))
+        # Copy Python file directly to job root directory
+        destination = job_dir / code_path_obj.name
+        shutil.copy2(str(code_path_obj), str(destination))
 
         # Generate bash script for Python execution with uv
         dependencies = dependencies or []
@@ -1583,9 +1554,8 @@ uv venv
 # Activate the virtual environment
 source .venv/bin/activate
 {install_commands}
-# Navigate to code directory and execute
-cd code
-python {entry_point}
+# Execute the Python file directly from job root
+python {code_path_obj.name}
 """
 
         # Create run.sh file
@@ -1606,7 +1576,7 @@ python {entry_point}
             "submitted_at": datetime.now(timezone.utc).isoformat(),
             "type": "python",
             "code_path": str(code_path_obj),
-            "entry_point": entry_point,
+            "entry_point": code_path_obj.name,
             "dependencies": all_dependencies,
         }
 
