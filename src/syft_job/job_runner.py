@@ -202,7 +202,7 @@ class SyftJobRunner:
         Returns:
             bool: True if execution was successful, False otherwise
         """
-        time.sleep(5)
+        time.sleep(6)
         approved_dir = self.config.get_approved_dir(self.config.email)
         job_dir = approved_dir / job_name
         run_script = job_dir / "run.sh"
