@@ -4,6 +4,7 @@ import subprocess
 import time
 from typing import List, Set
 
+from . import __version__
 from .config import SyftJobConfig
 
 
@@ -201,6 +202,7 @@ class SyftJobRunner:
         Returns:
             bool: True if execution was successful, False otherwise
         """
+        time.sleep(5)
         approved_dir = self.config.get_approved_dir(self.config.email)
         job_dir = approved_dir / job_name
         run_script = job_dir / "run.sh"
@@ -300,7 +302,7 @@ class SyftJobRunner:
         inbox_dir = self.config.get_inbox_dir(root_email)
         approved_dir = self.config.get_approved_dir(root_email)
 
-        print("🚀 SyftJob Runner started")
+        print(f"🚀 SyftJob Runner started: version: {__version__}")
         print(f"👤 Monitoring jobs for: {root_email}")
         print(f"📂 Inbox directory: {inbox_dir}")
         print(f"📂 Approved directory: {approved_dir}")
