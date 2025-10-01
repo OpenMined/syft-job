@@ -1473,6 +1473,7 @@ class JobClient:
         code_path: str,
         job_name: Optional[str] = "",
         entry_point: Optional[str] = None,
+        dependencies: Optional[List[str]] = None,
     ) -> Path:
         """
         Submit a Python job for a user.
@@ -1482,6 +1483,7 @@ class JobClient:
             job_name: Name of the job (will be used as directory name)
             code_path: Path to Python file or directory containing Python code
             entry_point: Python file to execute (required if code_path is a directory)
+            dependencies: List of Python packages to install (e.g., ["numpy", "pandas==1.5.0"])
 
         Returns:
             Path to the created job directory
@@ -1560,14 +1562,30 @@ class JobClient:
                 elif item.is_dir():
                     shutil.copytree(str(item), str(code_dir / item.name))
 
-        # Generate bash script for Python execution
+        # Generate bash script for Python execution with uv
+        dependencies = dependencies or []
+
+        # Always include syft-client as a default dependency
+        all_dependencies = ["syft-client"] + dependencies
+
+        # Create dependency installation commands
+        deps_str = " ".join(f'"{dep}"' for dep in all_dependencies)
+        install_commands = f"""
+# Install syft-client and custom dependencies
+uv pip install {deps_str}
+"""
+
         bash_script = f"""#!/bin/bash
 
-# Navigate to code directory
-cd code
+# Create isolated uv virtual environment
+uv venv
 
-# Execute Python script
-python3 {entry_point}
+# Activate the virtual environment
+source .venv/bin/activate
+{install_commands}
+# Navigate to code directory and execute
+cd code
+python {entry_point}
 """
 
         # Create run.sh file
@@ -1589,6 +1607,7 @@ python3 {entry_point}
             "type": "python",
             "code_path": str(code_path_obj),
             "entry_point": entry_point,
+            "dependencies": all_dependencies,
         }
 
         with open(config_yaml_path, "w") as f:
