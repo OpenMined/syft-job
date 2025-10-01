@@ -216,6 +216,10 @@ class SyftJobRunner:
             # Make run.sh executable
             os.chmod(run_script, 0o755)
 
+            # Prepare environment variables
+            env = os.environ.copy()
+            env["SYFTBOX_FOLDER"] = str(self.config.syftbox_folder)
+
             # Execute run.sh and capture output
             result = subprocess.run(
                 ["bash", str(run_script)],
@@ -223,6 +227,7 @@ class SyftJobRunner:
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
+                env=env,
             )
 
             # Move job to done directory
