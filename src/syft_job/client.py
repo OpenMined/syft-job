@@ -1577,7 +1577,7 @@ class JobClient:
         destination = job_dir / code_path_obj.name
         shutil.copy2(str(code_path_obj), str(destination))
 
-        # Generate bash script for Python execution with uv
+        # Generate bash script for Python execution with
         dependencies = dependencies or []
 
         # Always include syft-client as a default dependency
@@ -1587,16 +1587,16 @@ class JobClient:
         deps_str = " ".join(f'"{dep}"' for dep in all_dependencies)
         install_commands = f"""
 # Install syft-client and custom dependencies
-uv pip install {deps_str}
+pip install {deps_str}
 """
 
         bash_script = f"""#!/bin/bash
 
-# Create isolated uv virtual environment
-uv venv
-
-# Activate the virtual environment
+# Create isolated virtual environment
+python -m venv .venv --without-pip
 source .venv/bin/activate
+curl https://bootstrap.pypa.io/get-pip.py | python
+
 {install_commands}
 # Execute the Python file directly from job root
 python {code_path_obj.name}
