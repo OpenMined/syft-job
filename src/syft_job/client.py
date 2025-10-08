@@ -1587,7 +1587,7 @@ class JobClient:
         deps_str = " ".join(f'"{dep}"' for dep in all_dependencies)
         install_commands = f"""
 # Install syft-client and custom dependencies
-pip install -qq {deps_str}
+pip install {deps_str}
 """
 
         bash_script = f"""#!/bin/bash
