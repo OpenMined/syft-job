@@ -1,4 +1,4 @@
-__version__ = "0.1.16"
+__version__ = "0.1.17"
 
 from .client import JobClient, get_client
 from .config import SyftJobConfig

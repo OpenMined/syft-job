@@ -1,6 +1,6 @@
 [project]
 name = "syft-job"
-version = "0.1.16"
+version = "0.1.17"
 description = "A generic job submission system for data science workflows with syft:// URL support"
 readme = "README.md"
 requires-python = ">=3.10"
