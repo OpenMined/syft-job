@@ -1591,6 +1591,7 @@ uv pip install {deps_str}
 """
 
         bash_script = f"""#!/bin/bash
+export UV_SYSTEM_PYTHON=false
 
 # Create isolated uv virtual environment
 uv venv
