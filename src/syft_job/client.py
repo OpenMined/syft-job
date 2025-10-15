@@ -717,6 +717,56 @@ class JobInfo:
         """
         return StderrViewer(self)
 
+    def rerun(self) -> None:
+        """
+        Rerun a job by removing logs, outputs, and done marker file.
+        This makes the job executable again by clearing previous execution artifacts.
+
+        Removes:
+        - logs directory (if exists)
+        - outputs directory (if exists)
+        - done marker file (if exists)
+
+        Raises:
+            ValueError: If job is not in done status
+        """
+        if self.status != "done":
+            raise ValueError(
+                f"Job '{self.name}' is not in done status (current: {self.status}). "
+                f"Only completed jobs can be rerun."
+            )
+
+        changes_made = []
+
+        # Remove logs directory if it exists
+        logs_dir = self.location / "logs"
+        if logs_dir.exists() and logs_dir.is_dir():
+            shutil.rmtree(logs_dir)
+            changes_made.append("logs directory")
+
+        # Remove outputs directory if it exists
+        outputs_dir = self.location / "outputs"
+        if outputs_dir.exists() and outputs_dir.is_dir():
+            shutil.rmtree(outputs_dir)
+            changes_made.append("outputs directory")
+
+        # Remove done marker file if it exists
+        done_file = self.location / "done"
+        if done_file.exists():
+            done_file.unlink()
+            changes_made.append("done marker file")
+
+        # Update this object's state - job should now be approved (ready to run)
+        self.status = "approved"
+
+        # Show success message
+        if changes_made:
+            print(
+                f"🔄 Job '{self.name}' prepared for rerun! Removed: {', '.join(changes_made)}"
+            )
+        else:
+            print(f"🔄 Job '{self.name}' prepared for rerun! (No cleanup needed)")
+
     @property
     def files(self) -> List[Path]:
         """
