@@ -717,6 +717,22 @@ class JobInfo:
         """
         return StderrViewer(self)
 
+    @property
+    def files(self) -> List[Path]:
+        """
+        Get list of all file paths in the job folder.
+
+        Returns:
+            List of Path objects for all files and directories in the job folder.
+            Empty list if job folder doesn't exist or can't be accessed.
+        """
+        try:
+            if not self.location.exists():
+                return []
+            return [item for item in self.location.iterdir()]
+        except Exception:
+            return []
+
     def _get_python_syntax_highlighted_html(self, code: str) -> str:
         """Convert Python code to syntax-highlighted HTML."""
         # Basic Python syntax highlighting with colors
