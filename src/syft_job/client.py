@@ -573,6 +573,7 @@ class JobInfo:
         location: Path,
         config: SyftJobConfig,
         root_email: str,
+        submitted_at: Optional[str] = None,
     ):
         self.name = name
         self.user = user
@@ -581,6 +582,7 @@ class JobInfo:
         self.location = location
         self._config = config
         self._root_email = root_email
+        self.submitted_at = submitted_at
 
     def __str__(self) -> str:
         status_emojis = {"inbox": "📥", "approved": "✅", "done": "🎉"}
@@ -1288,12 +1290,8 @@ class JobsList:
             lines.append(header)
             lines.append("-" * len(header))
 
-            # Sort jobs by status priority (inbox, approved, done) then by name
-            status_priority = {"inbox": 1, "approved": 2, "done": 3}
-            sorted_jobs = sorted(
-                user_jobs,
-                key=lambda j: (status_priority.get(j.status, 4), j.name.lower()),
-            )
+            # Jobs are already sorted by submission time globally, preserve that order
+            sorted_jobs = user_jobs
 
             # Job rows with global indexing
             for job in sorted_jobs:
@@ -1680,12 +1678,8 @@ class JobsList:
             if not user_jobs:  # Skip users with no jobs
                 continue
 
-            # Sort jobs by status priority (inbox, approved, done) then by name
-            status_priority = {"inbox": 1, "approved": 2, "done": 3}
-            sorted_user_jobs = sorted(
-                user_jobs,
-                key=lambda j: (status_priority.get(j.status, 4), j.name.lower()),
-            )
+            # Jobs are already sorted by submission time globally, preserve that order
+            sorted_user_jobs = user_jobs
 
             # Calculate user summary
             user_status_counts: dict[str, int] = {}
@@ -2027,6 +2021,7 @@ python {code_path_obj.name}
                             location=job_dir,
                             config=self.config,
                             root_email=self.root_email,
+                            submitted_at=job_config.get("submitted_at"),
                         )
                     )
                 except Exception:
@@ -2054,11 +2049,35 @@ python {code_path_obj.name}
         """
         current_jobs = self._get_all_jobs()
 
-        # Sort jobs the same way as display (root user first, then alphabetically by user, then by status/name)
+        # Sort jobs by recent submissions first (newest first), then by user/status
         def job_sort_key(job):
+            # Parse submitted_at timestamp for sorting (most recent first)
+            try:
+                if job.submitted_at:
+                    from datetime import datetime
+
+                    # Parse ISO format timestamp
+                    dt = datetime.fromisoformat(job.submitted_at.replace("Z", "+00:00"))
+                    # Use negative timestamp for reverse chronological order (newest first)
+                    time_priority = -dt.timestamp()
+                else:
+                    # Jobs without submitted_at go to the end
+                    time_priority = float("inf")
+            except Exception:
+                # Invalid timestamps go to the end
+                time_priority = float("inf")
+
+            # Secondary sorting: user priority (root first), then user name, then status
             user_priority = 0 if job.user == self.root_email else 1
             status_priority = {"inbox": 1, "approved": 2, "done": 3}.get(job.status, 4)
-            return (user_priority, job.user, status_priority, job.name.lower())
+
+            return (
+                time_priority,
+                user_priority,
+                job.user,
+                status_priority,
+                job.name.lower(),
+            )
 
         sorted_jobs = sorted(current_jobs, key=job_sort_key)
         return JobsList(sorted_jobs, self.user_email)
