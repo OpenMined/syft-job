@@ -1777,11 +1777,11 @@ class JobClient:
         self.root_email = config.email  # From SyftBox folder (for "submitted_by")
         self.user_email = user_email or config.email  # Target user for job views
 
-        # Validate that user_email exists in datasites
+        # Validate that user_email exists in SyftBox root
         self._validate_user_email()
 
     def _validate_user_email(self) -> None:
-        """Validate that the user_email directory exists in datasites."""
+        """Validate that the user_email directory exists in SyftBox root."""
         user_dir = self.config.get_user_dir(self.user_email)
         if not user_dir.exists():
             # Create user directory if it doesn't exist
@@ -1977,15 +1977,15 @@ python {code_path_obj.name}
         return job_dir
 
     def _get_all_jobs(self) -> List[JobInfo]:
-        """Get all jobs from all datasites (inbox, approved, done)."""
+        """Get all jobs from all peer directories (inbox, approved, done)."""
         jobs: list[JobInfo] = []
-        datasites_dir = self.config.datasites_dir
+        syftbox_root = Path(self.config.syftbox_folder)
 
-        if not datasites_dir.exists():
+        if not syftbox_root.exists():
             return jobs
 
-        # Scan through all user directories in datasites
-        for user_dir in datasites_dir.iterdir():
+        # Scan through all user directories in SyftBox root (peers)
+        for user_dir in syftbox_root.iterdir():
             if not user_dir.is_dir():
                 continue
 
@@ -2011,7 +2011,7 @@ python {code_path_obj.name}
                     # Determine status from marker files
                     status = self.config.get_job_status(job_dir)
 
-                    # Include all jobs from all datasites
+                    # Include all jobs from all peer directories
                     jobs.append(
                         JobInfo(
                             name=job_config.get("name", job_dir.name),
@@ -2033,7 +2033,7 @@ python {code_path_obj.name}
     @property
     def jobs(self) -> JobsList:
         """
-        Get all jobs from all datasites as an indexable list grouped by user.
+        Get all jobs from all peer directories as an indexable list grouped by user.
 
         Returns a JobsList object that can be:
         - Indexed: jobs[0], jobs[1], etc.
@@ -2042,10 +2042,10 @@ python {code_path_obj.name}
         - HTML display: in Jupyter, shows separate tables for each user with jobs
 
         Each job has an accept_by_depositing_result() method for approval.
-        Only displays users that have jobs (skips empty datasites).
+        Only displays users that have jobs (skips empty peer directories).
 
         Returns:
-            JobsList containing all jobs from all datasites, grouped by user
+            JobsList containing all jobs from all peer directories, grouped by user
         """
         current_jobs = self._get_all_jobs()
 

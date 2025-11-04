@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 class SyftJobConfig(BaseModel):
     """Configuration for SyftJob system."""
 
-    syftbox_folder: str = Field(..., description="Path to SyftBox_{email} folder")
-    email: str = Field(..., description="User email address extracted from folder name")
+    syftbox_folder: str = Field(..., description="Path to SyftBox root folder")
+    email: str = Field(..., description="User email address")
 
     @classmethod
     def from_syftbox_folder(
@@ -40,17 +40,21 @@ class SyftJobConfig(BaseModel):
             "from_file is deprecated. Use from_syftbox_folder instead."
         )
 
-    @property
-    def datasites_dir(self) -> Path:
-        """Get the datasites directory path."""
-        return Path(self.syftbox_folder) / "datasites"
-
     def get_user_dir(self, user_email: str) -> Path:
-        """Get the directory path for a specific user."""
-        return self.datasites_dir / user_email
+        """
+        Get the directory path for a specific user (peer).
+
+        New structure: SyftBox/<user_email>/
+        (No datasites folder)
+        """
+        return Path(self.syftbox_folder) / user_email
 
     def get_job_dir(self, user_email: str) -> Path:
-        """Get the job directory path for a specific user."""
+        """
+        Get the job directory path for a specific user.
+
+        Path: SyftBox/<user_email>/app_data/job/
+        """
         return self.get_user_dir(user_email) / "app_data" / "job"
 
     def get_job_status(self, job_path: Path) -> str:
