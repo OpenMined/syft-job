@@ -2083,16 +2083,19 @@ python {code_path_obj.name}
         return JobsList(sorted_jobs, self.user_email)
 
 
-def get_client(syftbox_folder_path: str, user_email: Optional[str] = None) -> JobClient:
+def get_client(
+    syftbox_folder_path: str, email: str, user_email: Optional[str] = None
+) -> JobClient:
     """
     Factory function to create a JobClient from SyftBox folder.
 
     Args:
-        syftbox_folder_path: Path to the SyftBox_{root_email} folder
-        user_email: Optional target user email for job views (defaults to root_email)
+        syftbox_folder_path: Path to the SyftBox folder
+        email: Root user email address (explicit, no inference from folder name)
+        user_email: Optional target user email for job views (defaults to root email)
 
     Returns:
         Configured JobClient instance
     """
-    config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path)
+    config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path, email)
     return JobClient(config, user_email)

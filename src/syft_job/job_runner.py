@@ -323,16 +323,19 @@ class SyftJobRunner:
             raise
 
 
-def create_runner(syftbox_folder_path: str, poll_interval: int = 5) -> SyftJobRunner:
+def create_runner(
+    syftbox_folder_path: str, email: str, poll_interval: int = 5
+) -> SyftJobRunner:
     """
     Factory function to create a SyftJobRunner from SyftBox folder.
 
     Args:
-        syftbox_folder_path: Path to the SyftBox_{email} folder
+        syftbox_folder_path: Path to the SyftBox folder
+        email: Email address of the user (no inference, explicit required)
         poll_interval: How often to check for new jobs (in seconds)
 
     Returns:
         Configured SyftJobRunner instance
     """
-    config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path)
+    config = SyftJobConfig.from_syftbox_folder(syftbox_folder_path, email)
     return SyftJobRunner(config, poll_interval)

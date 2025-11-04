@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -11,8 +10,19 @@ class SyftJobConfig(BaseModel):
     email: str = Field(..., description="User email address extracted from folder name")
 
     @classmethod
-    def from_syftbox_folder(cls, syftbox_folder_path: str) -> "SyftJobConfig":
-        """Load configuration from SyftBox folder path."""
+    def from_syftbox_folder(
+        cls, syftbox_folder_path: str, email: str
+    ) -> "SyftJobConfig":
+        """
+        Load configuration from SyftBox folder path with explicit email.
+
+        Args:
+            syftbox_folder_path: Path to the SyftBox folder
+            email: User email address (explicit, no inference from folder name)
+
+        Returns:
+            SyftJobConfig instance
+        """
         syftbox_path = Path(syftbox_folder_path).expanduser().resolve()
 
         if not syftbox_path.exists():
@@ -20,16 +30,6 @@ class SyftJobConfig(BaseModel):
 
         if not syftbox_path.is_dir():
             raise ValueError(f"Path is not a directory: {syftbox_folder_path}")
-
-        # Extract email from folder name (SyftBox_{email})
-        folder_name = syftbox_path.name
-        match = re.match(r"^SyftBox_(.+)$", folder_name)
-        if not match:
-            raise ValueError(
-                f"Invalid SyftBox folder name format. Expected 'SyftBox_{{email}}', got: {folder_name}"
-            )
-
-        email = match.group(1)
 
         return cls(syftbox_folder=str(syftbox_path), email=email)
 

@@ -18,18 +18,19 @@ def main():
         epilog="""
 Examples:
   # Start monitoring jobs
-  syft-job-runner --syftbox-folder /path/to/SyftBox_user@example.com
+  syft-job-runner --syftbox-folder /path/to/SyftBox --email user@example.com
 
   # Reset all jobs and recreate folder structure
-  syft-job-runner --syftbox-folder /path/to/SyftBox_user@example.com --reset
+  syft-job-runner --syftbox-folder /path/to/SyftBox --email user@example.com --reset
 
   # Reset and then start monitoring
-  syft-job-runner --syftbox-folder /path/to/SyftBox_user@example.com --reset --run
+  syft-job-runner --syftbox-folder /path/to/SyftBox --email user@example.com --reset --run
         """,
     )
     parser.add_argument(
-        "--syftbox-folder", required=True, help="Path to the SyftBox_{email} folder"
+        "--syftbox-folder", required=True, help="Path to the SyftBox folder"
     )
+    parser.add_argument("--email", required=True, help="User email address")
     parser.add_argument(
         "--poll-interval",
         type=int,
@@ -59,7 +60,7 @@ Examples:
         sys.exit(1)
 
     try:
-        runner = create_runner(str(syftbox_folder_path), args.poll_interval)
+        runner = create_runner(str(syftbox_folder_path), args.email, args.poll_interval)
 
         # Handle reset flag
         if args.reset:
